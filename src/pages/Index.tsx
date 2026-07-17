@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Plus, PenLine, Search } from 'lucide-react';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
-import { useStructuredNotes, usePublishNote } from '@/hooks/useStructuredNotes';
+import { useStructuredNotes, usePublishNote, useTagCounts } from '@/hooks/useStructuredNotes';
 import { useToast } from '@/hooks/useToast';
 
 const Index = () => {
@@ -37,17 +37,8 @@ const Index = () => {
       'Create, search, tag, comment, and export structured text notes on Nostr.',
   });
 
-  // Extract tags from loaded notes for the tag browser
-  const tagCounts = useMemo(() => {
-    if (!notes) return new Map<string, number>();
-    const counts = new Map<string, number>();
-    for (const note of notes) {
-      for (const tag of note.tags) {
-        counts.set(tag, (counts.get(tag) || 0) + 1);
-      }
-    }
-    return counts;
-  }, [notes]);
+  // Always fetch tag counts for the tag browser (lightweight, cached)
+  const { data: tagCounts } = useTagCounts();
 
   // Filter and sort notes for display
   const filteredNotes = useMemo(() => {
@@ -149,7 +140,7 @@ const Index = () => {
           onSearchChange={setSearch}
           selectedTags={selectedTags}
           onRemoveTag={handleRemoveTag}
-          availableTags={tagCounts}
+          availableTags={tagCounts ?? new Map()}
           onAddTag={handleAddTag}
         />
 
@@ -183,7 +174,7 @@ const Index = () => {
             onSubmit={handleCreateNote}
             onCancel={() => setShowForm(false)}
             isSubmitting={isPublishing}
-            availableTags={tagCounts}
+            availableTags={tagCounts ?? new Map()}
           />
         )}
 

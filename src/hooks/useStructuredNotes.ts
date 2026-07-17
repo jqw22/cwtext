@@ -51,6 +51,40 @@ function parseNote(event: NostrEvent): StructuredNote {
   };
 }
 
+/**
+ * Fetch tag counts for the tag browser. Always enabled, lightweight query.
+ * Fetches a set of recent notes to extract tag metadata for the UI.
+ */
+export function useTagCounts() {
+  const { nostr } = useNostr();
+
+  return useQuery({
+    queryKey: ['nostr', 'tags', APP_AUTHOR_PUBKEY],
+    queryFn: async () => {
+      const filter: Record<string, unknown> = {
+        kinds: [NOTE_KIND],
+        authors: [APP_AUTHOR_PUBKEY],
+        limit: 100,
+      };
+
+      const events = await nostr.query([filter], {
+        signal: AbortSignal.timeout(5000),
+      });
+
+      const counts = new Map<string, number>();
+      for (const event of events) {
+        for (const tag of event.tags) {
+          if (tag[0] === 't' && tag[1]) {
+            counts.set(tag[1], (counts.get(tag[1]) || 0) + 1);
+          }
+        }
+      }
+      return counts;
+    },
+    staleTime: 5 * 60 * 1000, // Cache tags for 5 minutes
+  });
+}
+
 interface UseNotesOptions {
   /** Filter by category tags */
   tags?: string[];
@@ -58,7 +92,7 @@ interface UseNotesOptions {
   search?: string;
   /** Maximum notes to fetch */
   limit?: number;
-  /** Only fetch when true */
+  /** Only fetch when true (defaults to true) */
   enabled?: boolean;
 }
 
