@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Plus, PenLine, Search } from 'lucide-react';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useStructuredNotes, usePublishNote, useTagCounts } from '@/hooks/useStructuredNotes';
+import { useCommentCounts } from '@/hooks/useComments';
 import { useToast } from '@/hooks/useToast';
 
 const Index = () => {
@@ -39,6 +40,9 @@ const Index = () => {
 
   // Always fetch tag counts for the tag browser (lightweight, cached)
   const { data: tagCounts } = useTagCounts();
+
+  // Fetch comment counts for the note list (batch query, cached)
+  const { data: commentCounts } = useCommentCounts();
 
   // Filter and sort notes for display
   const filteredNotes = useMemo(() => {
@@ -233,7 +237,7 @@ const Index = () => {
         {hasSearched && !isLoading && filteredNotes.length > 0 && (
           <div className="max-w-none">
             {filteredNotes.map((note) => (
-              <NoteCard key={note.id} note={note} />
+              <NoteCard key={note.id} note={note} commentCount={commentCounts?.get(note.id)} />
             ))}
           </div>
         )}

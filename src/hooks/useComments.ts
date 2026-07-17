@@ -1,6 +1,43 @@
 import { NKinds, NostrEvent, NostrFilter } from '@nostrify/nostrify';
 import { useNostr } from '@nostrify/react';
 import { useQuery } from '@tanstack/react-query';
+import { APP_AUTHOR_PUBKEY } from '@/lib/appAuthor';
+
+/** Batch-fetch comment counts for all notes by the app author.
+ *  Returns a Map of note d-tag → count. */
+export function useCommentCounts() {
+  const { nostr } = useNostr();
+
+  return useQuery({
+    queryKey: ['nostr', 'commentCounts', APP_AUTHOR_PUBKEY],
+    queryFn: async () => {
+      const filter: NostrFilter = {
+        kinds: [1111],
+        authors: [APP_AUTHOR_PUBKEY],
+        limit: 500,
+      };
+
+      const events = await nostr.query([filter], {
+        signal: AbortSignal.timeout(5000),
+      });
+
+      const counts = new Map<string, number>();
+      for (const event of events) {
+        // Find the 'a' tag (kind:pubkey:d-tag) or 'e' tag (event id) reference
+        const aTag = event.tags.find(([n]) => n === 'a')?.[1];
+        if (aTag) {
+          const parts = aTag.split(':');
+          const d = parts[2]; // kind:pubkey:d-tag
+          if (d) {
+            counts.set(d, (counts.get(d) || 0) + 1);
+          }
+        }
+      }
+      return counts;
+    },
+    staleTime: 2 * 60 * 1000, // Refresh every 2 minutes
+  });
+}
 
 export function useComments(root: NostrEvent | URL | `#${string}`, limit?: number) {
   const { nostr } = useNostr();
