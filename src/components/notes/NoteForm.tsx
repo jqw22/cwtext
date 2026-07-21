@@ -152,7 +152,7 @@ export function NoteForm({
           {/* Order number (for sequencing) */}
           <div className="space-y-2">
             <label htmlFor="note-order" className="text-sm font-medium text-muted-foreground">
-              Order <span className="text-xs font-normal">(optional, for sorting)</span>
+              Order <span className="text-xs font-normal">(use para. for correct sorting)</span>
             </label>
             <Input
               id="note-order"

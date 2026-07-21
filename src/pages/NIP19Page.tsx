@@ -12,8 +12,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Clock, User, Pencil } from 'lucide-react';
-import { CommentsSection } from '@/components/comments/CommentsSection';
-import type { NostrEvent } from '@nostrify/nostrify';
 import { APP_AUTHOR_PUBKEY } from '@/lib/appAuthor';
 import NotFound from './NotFound';
 
@@ -204,11 +202,6 @@ function StructuredNoteView({ id }: { id: string }) {
             <p key={i} className="mb-3 leading-relaxed">{line || '\u00A0'}</p>
           ))}
         </div>
-
-        <section className="border-t pt-8 mt-8">
-          <h2 className="text-lg font-semibold mb-6">Comments</h2>
-          <CommentsSection root={note.event as NostrEvent} />
-        </section>
       </article>
     </div>
   );

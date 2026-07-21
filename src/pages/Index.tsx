@@ -7,23 +7,25 @@ import { SearchFilters } from '@/components/notes/SearchFilters';
 import { ExportODTButton } from '@/components/notes/ExportODTButton';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, PenLine, Search } from 'lucide-react';
+import { Plus, PenLine, Search, Lock, UserPlus } from 'lucide-react';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useStructuredNotes, usePublishNote, useTagCounts } from '@/hooks/useStructuredNotes';
-import { useCommentCounts } from '@/hooks/useComments';
+import { useUserNotes, usePublishUserNote } from '@/hooks/useUserNotes';
 import { useToast } from '@/hooks/useToast';
+import { APP_AUTHOR_PUBKEY } from '@/lib/appAuthor';
 
 const Index = () => {
   const { user } = useCurrentUser();
   const { toast } = useToast();
-  const [showForm, setShowForm] = useState(false);
+  const [showCuratedForm, setShowCuratedForm] = useState(false);
+  const [showUserForm, setShowUserForm] = useState(false);
   const [search, setSearch] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
-  // A search is "initiated" when the user has typed something or selected a tag
   const hasSearched = search.trim().length > 0 || selectedTags.length > 0;
+  const isAppAuthor = user?.pubkey === APP_AUTHOR_PUBKEY;
 
-  // Only fetch notes after a search has been initiated
+  // Curated notes (app author's, gated behind search)
   const { data: notes, isLoading, error } = useStructuredNotes({
     tags: selectedTags.length > 0 ? selectedTags : undefined,
     search: search.trim() || undefined,
@@ -32,32 +34,29 @@ const Index = () => {
 
   const { mutateAsync: publishNote, isPending: isPublishing } = usePublishNote();
 
+  // User's private encrypted notes (always loaded when logged in)
+  const { data: userNotes, isLoading: userNotesLoading } = useUserNotes();
+  const { mutateAsync: publishUserNote, isPending: isPublishingUser } = usePublishUserNote();
+
   useSeoMeta({
     title: 'cwtext — Structured Notes',
-    description:
-      'Create, search, tag, comment, and export structured text notes on Nostr.',
+    description: 'Create, search, tag, and export structured text notes on Nostr.',
   });
 
-  // Always fetch tag counts for the tag browser (lightweight, cached)
   const { data: tagCounts } = useTagCounts();
 
-  // Fetch comment counts for the note list (batch query, cached)
-  const { data: commentCounts } = useCommentCounts();
-
-  // Filter and sort notes for display
+  // Filter and sort curated notes
   const filteredNotes = useMemo(() => {
     if (!notes || !hasSearched) return [];
 
     let result = notes;
 
-    // Tag filtering already done at relay level, but double-check
     if (selectedTags.length > 0) {
       result = result.filter((note) =>
         selectedTags.some((tag) => note.tags.includes(tag)),
       );
     }
 
-    // Search filter (title, content, tags) — client-side
     if (search.trim()) {
       const q = search.toLowerCase();
       result = result.filter(
@@ -68,7 +67,6 @@ const Index = () => {
       );
     }
 
-    // Sort by order ascending (notes without order go to end)
     result = [...result].sort((a, b) => {
       if (a.order === Infinity && b.order === Infinity) return 0;
       if (a.order === Infinity) return 1;
@@ -80,9 +78,7 @@ const Index = () => {
   }, [notes, selectedTags, search, hasSearched]);
 
   const handleAddTag = useCallback((tag: string) => {
-    setSelectedTags((prev) =>
-      prev.includes(tag) ? prev : [...prev, tag],
-    );
+    setSelectedTags((prev) => (prev.includes(tag) ? prev : [...prev, tag]));
   }, []);
 
   const handleRemoveTag = useCallback((tag: string) => {
@@ -91,31 +87,30 @@ const Index = () => {
 
   const handleCreateNote = useCallback(
     async (data: { title: string; content: string; tags: string[]; order?: string }) => {
-      if (!user) {
-        toast({
-          title: 'Login required',
-          description: 'You need to be logged in to publish notes.',
-          variant: 'destructive',
-        });
-        return;
-      }
-
+      if (!user) return;
       try {
         await publishNote(data);
-        setShowForm(false);
-        toast({
-          title: 'Note published!',
-          description: `"${data.title}" has been published to Nostr.`,
-        });
+        setShowCuratedForm(false);
+        toast({ title: 'Note published!', description: `"${data.title}" has been published to Nostr.` });
       } catch (err) {
-        toast({
-          title: 'Failed to publish',
-          description: err instanceof Error ? err.message : 'An error occurred.',
-          variant: 'destructive',
-        });
+        toast({ title: 'Failed to publish', description: err instanceof Error ? err.message : 'An error occurred.', variant: 'destructive' });
       }
     },
     [user, publishNote, toast],
+  );
+
+  const handleCreateUserNote = useCallback(
+    async (data: { title: string; content: string; tags: string[]; order?: string }) => {
+      if (!user) return;
+      try {
+        await publishUserNote(data);
+        setShowUserForm(false);
+        toast({ title: 'Note saved', description: 'Your private note has been encrypted and saved.' });
+      } catch (err) {
+        toast({ title: 'Failed to save', description: err instanceof Error ? err.message : 'An error occurred.', variant: 'destructive' });
+      }
+    },
+    [user, publishUserNote, toast],
   );
 
   return (
@@ -137,8 +132,8 @@ const Index = () => {
         </div>
       </header>
 
-      <main className="container py-6 space-y-6">
-        {/* Search & Tags */}
+      <main className="container py-6">
+        {/* Search & Tags — full width */}
         <SearchFilters
           search={search}
           onSearchChange={setSearch}
@@ -148,114 +143,180 @@ const Index = () => {
           onAddTag={handleAddTag}
         />
 
-        {/* Action bar */}
-        <div className="flex items-center justify-between">
-          {hasSearched ? (
-            <p className="text-sm text-muted-foreground">
-              {filteredNotes.length > 0
-                ? `Showing ${filteredNotes.length} note${filteredNotes.length !== 1 ? 's' : ''}`
-                : 'No notes found'}
-            </p>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Use the search bar above or click a tag to find notes
-            </p>
-          )}
-          {user && (
-            <Button
-              onClick={() => setShowForm(!showForm)}
-              variant={showForm ? 'secondary' : 'default'}
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              {showForm ? 'Close Form' : 'New Note'}
-            </Button>
-          )}
-        </div>
+        {/* Split layout: 2/3 curated notes + 1/3 user notes */}
+        <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Left — Curated Notes (2/3) */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Action bar */}
+            <div className="flex items-center justify-between pt-2">
+              {hasSearched ? (
+                <p className="text-sm text-muted-foreground">
+                  {filteredNotes.length > 0
+                    ? `Showing ${filteredNotes.length} note${filteredNotes.length !== 1 ? 's' : ''}`
+                    : 'No notes found'}
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Use the search bar above or click a tag to find notes
+                </p>
+              )}
+              {isAppAuthor && (
+                <Button
+                  onClick={() => setShowCuratedForm(!showCuratedForm)}
+                  variant={showCuratedForm ? 'secondary' : 'default'}
+                  size="sm"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  {showCuratedForm ? 'Close Form' : 'New Note'}
+                </Button>
+              )}
+            </div>
 
-        {/* Note form (when expanded) */}
-        {showForm && user && (
-          <NoteForm
-            onSubmit={handleCreateNote}
-            onCancel={() => setShowForm(false)}
-            isSubmitting={isPublishing}
-            availableTags={tagCounts ?? new Map()}
-          />
-        )}
+            {/* Curated note form */}
+            {showCuratedForm && isAppAuthor && (
+              <NoteForm
+                onSubmit={handleCreateNote}
+                onCancel={() => setShowCuratedForm(false)}
+                isSubmitting={isPublishing}
+                availableTags={tagCounts ?? new Map()}
+              />
+            )}
 
-        {/* Welcome state — no search yet */}
-        {!hasSearched && !showForm && (
-          <div className="text-center py-24 border-2 border-dashed rounded-xl">
-            <Search className="h-16 w-16 mx-auto mb-6 text-muted-foreground/20" />
-            <h2 className="text-2xl font-semibold mb-3">Find your notes</h2>
-            <p className="text-muted-foreground max-w-md mx-auto text-lg">
-              Search by keyword or click a tag below to browse notes on Nostr.
-            </p>
-            <p className="text-muted-foreground/60 text-sm mt-8 max-w-sm mx-auto">
-              New here? Click "New Note" to create your first entry. It gets published to Nostr and becomes searchable by everyone.
-            </p>
-          </div>
-        )}
-
-        {/* Loading state */}
-        {hasSearched && isLoading && (
-          <div className="space-y-5">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="space-y-2 py-4 border-b border-border/40">
-                <Skeleton className="h-5 w-48" />
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-5/6" />
-                <Skeleton className="h-4 w-3/4" />
+            {/* Welcome state */}
+            {!hasSearched && !showCuratedForm && (
+              <div className="text-center py-24 border-2 border-dashed rounded-xl">
+                <Search className="h-16 w-16 mx-auto mb-6 text-muted-foreground/20" />
+                <h2 className="text-2xl font-semibold mb-3">Find your notes</h2>
+                <p className="text-muted-foreground max-w-md mx-auto text-lg">
+                  Search by keyword or click a tag below to browse notes on Nostr.
+                </p>
               </div>
-            ))}
-          </div>
-        )}
+            )}
 
-        {/* Error state */}
-        {hasSearched && error && (
-          <div className="text-center py-12">
-            <p className="text-destructive text-lg font-medium mb-2">
-              Failed to load notes
-            </p>
-            <p className="text-muted-foreground text-sm">
-              Check your relay connections and try again.
-            </p>
-          </div>
-        )}
+            {/* Loading */}
+            {hasSearched && isLoading && (
+              <div className="space-y-5">
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="space-y-2 py-4 border-b border-border/40">
+                    <Skeleton className="h-5 w-48" />
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-5/6" />
+                    <Skeleton className="h-4 w-3/4" />
+                  </div>
+                ))}
+              </div>
+            )}
 
-        {/* Empty results state */}
-        {hasSearched && !isLoading && !error && filteredNotes.length === 0 && (
-          <div className="text-center py-16 border-2 border-dashed rounded-xl">
-            <PenLine className="h-12 w-12 mx-auto mb-4 text-muted-foreground/40" />
-            <h2 className="text-xl font-semibold mb-2">No results</h2>
-            <p className="text-muted-foreground max-w-md mx-auto mb-6">
-              Try adjusting your search or filter criteria.
-            </p>
-          </div>
-        )}
+            {/* Error */}
+            {hasSearched && error && (
+              <div className="text-center py-12">
+                <p className="text-destructive text-lg font-medium mb-2">Failed to load notes</p>
+                <p className="text-muted-foreground text-sm">Check your relay connections and try again.</p>
+              </div>
+            )}
 
-        {/* Notes list */}
-        {hasSearched && !isLoading && filteredNotes.length > 0 && (
-          <div className="max-w-none">
-            {filteredNotes.map((note) => (
-              <NoteCard key={note.id} note={note} commentCount={commentCounts?.get(note.id)} />
-            ))}
-          </div>
-        )}
+            {/* Empty */}
+            {hasSearched && !isLoading && !error && filteredNotes.length === 0 && (
+              <div className="text-center py-16 border-2 border-dashed rounded-xl">
+                <PenLine className="h-12 w-12 mx-auto mb-4 text-muted-foreground/40" />
+                <h2 className="text-xl font-semibold mb-2">No results</h2>
+                <p className="text-muted-foreground max-w-md mx-auto mb-6">
+                  Try adjusting your search or filter criteria.
+                </p>
+              </div>
+            )}
 
-        {/* Footer note */}
-        {hasSearched && !isLoading && !error && filteredNotes.length > 0 && (
-          <p className="text-center text-xs text-muted-foreground pb-8">
-            Powered by Nostr · Vibed with{' '}
-            <a
-              href="https://shakespeare.diy"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline hover:text-foreground transition-colors"
-            >
-              Shakespeare
-            </a>
-          </p>
-        )}
+            {/* Notes list */}
+            {hasSearched && !isLoading && filteredNotes.length > 0 && (
+              <div className="max-w-none">
+                {filteredNotes.map((note) => (
+                  <NoteCard key={note.id} note={note} />
+                ))}
+              </div>
+            )}
+
+            {hasSearched && !isLoading && !error && filteredNotes.length > 0 && (
+              <p className="text-center text-xs text-muted-foreground pb-8">
+                Powered by Nostr · Vibed with{' '}
+                <a href="https://shakespeare.diy" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">
+                  Shakespeare
+                </a>
+              </p>
+            )}
+          </div>
+
+          {/* Right — User Notes (1/3) */}
+          <div className="lg:col-span-1">
+            <div className="sticky top-20 space-y-4">
+              <div className="flex items-center gap-2">
+                <Lock className="h-4 w-4 text-muted-foreground" />
+                <h2 className="text-sm font-semibold">Your Notes</h2>
+                <span className="text-xs text-muted-foreground">(encrypted)</span>
+              </div>
+
+              {!user ? (
+                <div className="text-center py-12 border-2 border-dashed rounded-xl">
+                  <UserPlus className="h-12 w-12 mx-auto mb-4 text-muted-foreground/20" />
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Log in to create private encrypted notes
+                  </p>
+                  <LoginArea className="w-auto" />
+                </div>
+              ) : (
+                <>
+                  <Button
+                    onClick={() => setShowUserForm(!showUserForm)}
+                    variant={showUserForm ? 'secondary' : 'outline'}
+                    size="sm"
+                    className="w-full"
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    {showUserForm ? 'Close Form' : 'New Private Note'}
+                  </Button>
+
+                  {showUserForm && (
+                    <NoteForm
+                      onSubmit={handleCreateUserNote}
+                      onCancel={() => setShowUserForm(false)}
+                      isSubmitting={isPublishingUser}
+                      availableTags={tagCounts ?? new Map()}
+                    />
+                  )}
+
+                  {/* User's notes list */}
+                  {userNotesLoading ? (
+                    <div className="space-y-3">
+                      {[...Array(3)].map((_, i) => (
+                        <div key={i} className="space-y-2 py-3 border-b border-border/40">
+                          <Skeleton className="h-4 w-32" />
+                          <Skeleton className="h-3 w-full" />
+                          <Skeleton className="h-3 w-5/6" />
+                        </div>
+                      ))}
+                    </div>
+                  ) : userNotes && userNotes.length > 0 ? (
+                    <div className="space-y-1">
+                      {userNotes.map((note) => (
+                        <div key={note.id} className="py-3 border-b border-border/30 last:border-b-0">
+                          <h3 className="text-sm font-semibold text-foreground mb-1">
+                            {note.title}
+                          </h3>
+                          <p className="text-xs text-foreground/70 whitespace-pre-line line-clamp-3">
+                            {note.content}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground text-center py-8">
+                      No private notes yet. Create your first one above.
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
       </main>
     </div>
   );
