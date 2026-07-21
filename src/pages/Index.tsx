@@ -47,18 +47,6 @@ const Index = () => {
   const tagCounts = useMemo(() => {
     const counts = new Map<string, number>();
 
-    // Start with cached counts from localStorage
-    try {
-      const cached = localStorage.getItem('cwtext:tagCounts');
-      if (cached) {
-        const parsed = JSON.parse(cached) as [string, number][];
-        for (const [tag, count] of parsed) {
-          counts.set(tag, count);
-        }
-      }
-    } catch { /* ignore corrupt cache */ }
-
-    // Overlay counts from currently loaded notes
     if (notes) {
       for (const note of notes) {
         for (const tag of note.tags) {
@@ -67,7 +55,20 @@ const Index = () => {
       }
     }
 
-    // Persist to localStorage
+    // Merge with cached counts from localStorage (for tags from past loads)
+    try {
+      const cached = localStorage.getItem('cwtext:tagCounts');
+      if (cached) {
+        const parsed = JSON.parse(cached) as [string, number][];
+        for (const [tag, count] of parsed) {
+          if (!counts.has(tag)) {
+            counts.set(tag, count);
+          }
+        }
+      }
+    } catch { /* ignore corrupt cache */ }
+
+    // Persist merged counts
     try {
       localStorage.setItem('cwtext:tagCounts', JSON.stringify([...counts]));
     } catch { /* ignore storage full */ }
