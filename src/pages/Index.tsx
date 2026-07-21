@@ -7,7 +7,7 @@ import { SearchFilters } from '@/components/notes/SearchFilters';
 import { ExportODTButton } from '@/components/notes/ExportODTButton';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, PenLine, Search, Lock, UserPlus } from 'lucide-react';
+import { Plus, PenLine, Search, Lock, UserPlus, Pencil } from 'lucide-react';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useStructuredNotes, usePublishNote, useTagCounts } from '@/hooks/useStructuredNotes';
 import { useUserNotes, usePublishUserNote } from '@/hooks/useUserNotes';
@@ -19,6 +19,7 @@ const Index = () => {
   const { toast } = useToast();
   const [showCuratedForm, setShowCuratedForm] = useState(false);
   const [showUserForm, setShowUserForm] = useState(false);
+  const [editingUserNoteId, setEditingUserNoteId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
@@ -128,14 +129,15 @@ const Index = () => {
     async (data: { title: string; content: string; tags: string[]; order?: string }) => {
       if (!user) return;
       try {
-        await publishUserNote(data);
+        await publishUserNote({ ...data, dtag: editingUserNoteId ?? undefined });
         setShowUserForm(false);
-        toast({ title: 'Note saved', description: 'Your private note has been encrypted and saved.' });
+        setEditingUserNoteId(null);
+        toast({ title: editingUserNoteId ? 'Note updated' : 'Note saved', description: editingUserNoteId ? 'Your private note has been updated.' : 'Your private note has been encrypted and saved.' });
       } catch (err) {
         toast({ title: 'Failed to save', description: err instanceof Error ? err.message : 'An error occurred.', variant: 'destructive' });
       }
     },
-    [user, publishUserNote, toast],
+    [user, publishUserNote, toast, editingUserNoteId],
   );
 
   return (
@@ -302,11 +304,29 @@ const Index = () => {
                   {showUserForm && (
                     <NoteForm
                       onSubmit={handleCreateUserNote}
-                      onCancel={() => setShowUserForm(false)}
+                      onCancel={() => { setShowUserForm(false); setEditingUserNoteId(null); }}
                       isSubmitting={isPublishingUser}
                       availableTags={tagCounts ?? new Map()}
                     />
                   )}
+
+                  {/* Edit form for existing note */}
+                  {editingUserNoteId && !showUserForm && (() => {
+                    const note = userNotes?.find((n) => n.id === editingUserNoteId);
+                    if (!note) return null;
+                    return (
+                      <NoteForm
+                        initialTitle={note.title}
+                        initialContent={note.content}
+                        initialTags={note.tags}
+                        initialOrder={note.order !== Infinity ? String(note.order) : ''}
+                        onSubmit={handleCreateUserNote}
+                        onCancel={() => setEditingUserNoteId(null)}
+                        isSubmitting={isPublishingUser}
+                        availableTags={tagCounts ?? new Map()}
+                      />
+                    );
+                  })()}
 
                   {/* User's notes list */}
                   {userNotesLoading ? (
@@ -322,14 +342,22 @@ const Index = () => {
                   ) : userNotes && userNotes.length > 0 ? (
                     <div className="space-y-1">
                       {filteredUserNotes.map((note) => (
-                        <div key={note.id} className="py-3 border-b border-border/30 last:border-b-0">
-                          <h3 className="text-sm font-semibold text-foreground mb-1">
-                            {note.title}
-                          </h3>
+                        <button
+                          key={note.id}
+                          type="button"
+                          onClick={() => { setEditingUserNoteId(note.id); setShowUserForm(false); }}
+                          className="w-full text-left py-3 border-b border-border/30 last:border-b-0 hover:bg-muted/20 rounded px-2 -mx-2 transition-colors group"
+                        >
+                          <div className="flex items-start gap-2">
+                            <h3 className="text-sm font-semibold text-foreground mb-1 flex-1">
+                              {note.title}
+                            </h3>
+                            <Pencil className="h-3 w-3 text-muted-foreground/40 group-hover:text-muted-foreground shrink-0 mt-0.5" />
+                          </div>
                           <p className="text-xs text-foreground/70 whitespace-pre-line line-clamp-3">
                             {note.content}
                           </p>
-                        </div>
+                        </button>
                       ))}
                     </div>
                   ) : (

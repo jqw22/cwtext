@@ -91,6 +91,8 @@ interface CreateUserNoteParams {
   content: string;
   tags?: string[];
   order?: string;
+  /** Optional d-tag for editing an existing note */
+  dtag?: string;
 }
 
 /** Publish an encrypted user note (NIP-44 self-encrypt) */
@@ -104,10 +106,10 @@ export function usePublishUserNote() {
       if (!user) throw new Error('Must be logged in');
       if (!user.signer.nip44) throw new Error('Signer does not support NIP-44 encryption');
 
-      const { title, content, tags = [], order } = params;
+      const { title, content, tags = [], order, dtag } = params;
       const noteTags: string[][] = [];
 
-      noteTags.push(['d', crypto.randomUUID()]);
+      noteTags.push(['d', dtag ?? crypto.randomUUID()]);
       noteTags.push(['title', title]);
 
       for (const tag of tags) {
