@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Plus, PenLine, Search, Lock, UserPlus, Pencil } from 'lucide-react';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
-import { useStructuredNotes, usePublishNote } from '@/hooks/useStructuredNotes';
+import { useStructuredNotes, usePublishNote, useTagCounts } from '@/hooks/useStructuredNotes';
 import { useUserNotes, usePublishUserNote } from '@/hooks/useUserNotes';
 import { useToast } from '@/hooks/useToast';
 import { APP_AUTHOR_PUBKEY } from '@/lib/appAuthor';
@@ -26,10 +26,11 @@ const Index = () => {
   const hasSearched = search.trim().length > 0 || selectedTags.length > 0;
   const isAppAuthor = user?.pubkey === APP_AUTHOR_PUBKEY;
 
-  // Curated notes (always loaded — drives tag browser and search)
+  // Curated notes (gated behind search for scale)
   const { data: notes, isLoading, error } = useStructuredNotes({
     tags: selectedTags.length > 0 ? selectedTags : undefined,
     search: search.trim() || undefined,
+    enabled: hasSearched,
   });
 
   const { mutateAsync: publishNote, isPending: isPublishing } = usePublishNote();
@@ -43,17 +44,8 @@ const Index = () => {
     description: 'Create, search, tag, and export structured text notes on Nostr.',
   });
 
-  // Compute tag counts from loaded notes (always consistent with results)
-  const tagCounts = useMemo(() => {
-    if (!notes) return new Map<string, number>();
-    const counts = new Map<string, number>();
-    for (const note of notes) {
-      for (const tag of note.tags) {
-        counts.set(tag, (counts.get(tag) || 0) + 1);
-      }
-    }
-    return counts;
-  }, [notes]);
+  // Lightweight always-on tag query (no full note parsing, just tag extraction)
+  const { data: tagCounts } = useTagCounts();
 
   // Filter and sort curated notes
   const filteredNotes = useMemo(() => {

@@ -72,11 +72,11 @@ export function useTagCounts() {
       const filter: Record<string, unknown> = {
         kinds: [NOTE_KIND],
         authors: [APP_AUTHOR_PUBKEY],
-        limit: 500,
+        limit: 1000,
       };
 
       const events = await queryNostr.query([filter], {
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.timeout(15000),
       });
 
       const counts = new Map<string, number>();
@@ -89,7 +89,7 @@ export function useTagCounts() {
       }
       return counts;
     },
-    staleTime: 5 * 60 * 1000, // Cache tags for 5 minutes
+    staleTime: 10 * 60 * 1000, // Cache tags for 10 minutes
   });
 }
 
@@ -110,7 +110,7 @@ interface UseNotesOptions {
  */
 export function useStructuredNotes(options: UseNotesOptions = {}) {
   const { nostr } = useNostr();
-  const { tags, search, limit = 500, enabled = true } = options;
+  const { tags, search, limit = 200, enabled = true } = options;
 
   // Use fixed relay group so curated notes are consistent regardless of login
   const queryNostr = useMemo(() => nostr.group(CURATED_RELAYS), [nostr]);
