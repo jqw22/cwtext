@@ -384,7 +384,7 @@ const Index = () => {
                             </h3>
                             <Pencil className="h-3 w-3 text-muted-foreground/40 group-hover:text-muted-foreground shrink-0 mt-0.5" />
                           </div>
-                          <p className="text-xs text-foreground/70 whitespace-pre-line line-clamp-3">
+                          <p className="text-xs text-foreground/70 whitespace-pre-line">
                             {note.content}
                           </p>
                         </button>
