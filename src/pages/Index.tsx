@@ -304,7 +304,7 @@ const Index = () => {
 
           {/* Right — User Notes (1/3) */}
           <div className="lg:col-span-1">
-            <div className="sticky top-20 space-y-4">
+            <div className="sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto space-y-4 pr-1">
               <div className="flex items-center gap-2">
                 <Lock className="h-4 w-4 text-muted-foreground" />
                 <h2 className="text-sm font-semibold">Your Notes</h2>
