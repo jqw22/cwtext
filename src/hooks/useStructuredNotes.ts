@@ -62,20 +62,27 @@ const PAGE_SIZE = 500;
 /** Safety cap on pages fetched, so a misbehaving relay can't loop forever */
 const MAX_PAGES = 50;
 
+/** How long one page may take before that relay is given up on */
+const PAGE_TIMEOUT = 15000;
+
+interface Queryable {
+  query: (filters: NostrFilter[], opts?: { signal?: AbortSignal }) => Promise<NostrEvent[]>;
+}
+
 /**
- * Fetch every curated note by the app author, paging back in time with
- * `until` so collections larger than one relay response are complete.
- * Superseded versions of the same `d` tag are collapsed to the newest.
+ * Page back through one relay with `until` until it has nothing older.
+ * A relay that errors, closes the subscription or times out just stops
+ * contributing; whatever it already sent is kept.
  */
-export async function fetchAllNotes(
-  queryNostr: { query: (filters: NostrFilter[], opts?: { signal?: AbortSignal }) => Promise<NostrEvent[]> },
+async function fetchFromRelay(
+  relay: Queryable,
   signal: AbortSignal,
-): Promise<NostrEvent[]> {
+  onEvent: (event: NostrEvent) => void,
+): Promise<void> {
   const seen = new Set<string>();
-  const latest = new Map<string, NostrEvent>();
   let until: number | undefined;
 
-  for (let page = 0; page < MAX_PAGES; page++) {
+  for (let page = 0; page < MAX_PAGES && !signal.aborted; page++) {
     const filter: NostrFilter = {
       kinds: [NOTE_KIND],
       authors: [APP_AUTHOR_PUBKEY],
@@ -83,7 +90,14 @@ export async function fetchAllNotes(
     };
     if (until !== undefined) filter.until = until;
 
-    const events = await queryNostr.query([filter], { signal });
+    let events: NostrEvent[];
+    try {
+      events = await relay.query([filter], {
+        signal: AbortSignal.any([signal, AbortSignal.timeout(PAGE_TIMEOUT)]),
+      });
+    } catch {
+      return;
+    }
 
     let added = 0;
     let oldest = Infinity;
@@ -92,17 +106,42 @@ export async function fetchAllNotes(
       if (seen.has(event.id)) continue;
       seen.add(event.id);
       added++;
-
-      const d = event.tags.find(([n]) => n === 'd')?.[1] ?? event.id;
-      const current = latest.get(d);
-      if (!current || event.created_at > current.created_at) {
-        latest.set(d, event);
-      }
+      onEvent(event);
     }
 
     // `until` is inclusive, so a page with nothing new means we've reached the end
-    if (added === 0) break;
+    if (added === 0) return;
     until = oldest;
+  }
+}
+
+/**
+ * Fetch every curated note by the app author from each relay on its own,
+ * paging back in time with `until` so collections larger than one relay
+ * response are complete. Relays are not raced against each other: a fast
+ * relay that holds none of the notes can't cut the others off.
+ * Superseded versions of the same `d` tag are collapsed to the newest.
+ * Throws if no relay returned anything, so an empty result is retried
+ * rather than cached.
+ */
+export async function fetchAllNotes(
+  relays: Queryable[],
+  signal: AbortSignal,
+): Promise<NostrEvent[]> {
+  const latest = new Map<string, NostrEvent>();
+
+  const keep = (event: NostrEvent) => {
+    const d = event.tags.find(([n]) => n === 'd')?.[1] ?? event.id;
+    const current = latest.get(d);
+    if (!current || event.created_at > current.created_at) {
+      latest.set(d, event);
+    }
+  };
+
+  await Promise.all(relays.map((relay) => fetchFromRelay(relay, signal, keep)));
+
+  if (latest.size === 0) {
+    throw new Error('No notes received from any relay');
   }
 
   return [...latest.values()];
@@ -123,14 +162,15 @@ function byOrder(a: StructuredNote, b: StructuredNote): number {
 export function useStructuredNotes() {
   const { nostr } = useNostr();
 
-  // Use fixed relay group so curated notes are consistent regardless of login
-  const queryNostr = useMemo(() => nostr.group(CURATED_RELAYS), [nostr]);
+  // Fixed relays so curated notes are consistent regardless of login. Each is
+  // queried on its own; the shared connections come from the pool.
+  const relays = useMemo(() => CURATED_RELAYS.map((url) => nostr.relay(url)), [nostr]);
 
   return useQuery({
     queryKey: ['nostr', 'notes', APP_AUTHOR_PUBKEY],
     queryFn: async ({ signal }) => {
       const events = await fetchAllNotes(
-        queryNostr,
+        relays,
         AbortSignal.any([signal, AbortSignal.timeout(60000)]),
       );
       return events.map(parseNote).sort(byOrder);
@@ -143,7 +183,7 @@ export function useStructuredNotes() {
 export function useStructuredNote(id: string) {
   const { nostr } = useNostr();
   const queryClient = useQueryClient();
-  const queryNostr = useMemo(() => nostr.group(CURATED_RELAYS), [nostr]);
+  const relays = useMemo(() => CURATED_RELAYS.map((url) => nostr.relay(url)), [nostr]);
 
   return useQuery<StructuredNote | null>({
     queryKey: ['nostr', 'note', APP_AUTHOR_PUBKEY, id],
@@ -155,9 +195,11 @@ export function useStructuredNote(id: string) {
         limit: 1,
       };
 
-      const events = await queryNostr.query([filter], {
-        signal: AbortSignal.any([signal, AbortSignal.timeout(10000)]),
-      });
+      // Ask every relay and wait for each, so a relay without it can't answer first
+      const opts = { signal: AbortSignal.any([signal, AbortSignal.timeout(10000)]) };
+      const events = (await Promise.all(
+        relays.map((relay) => relay.query([filter], opts).catch(() => [])),
+      )).flat();
 
       if (events.length === 0) return null;
       const newest = events.reduce((a, b) => (b.created_at > a.created_at ? b : a));
