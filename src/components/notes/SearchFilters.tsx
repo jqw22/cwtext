@@ -12,6 +12,8 @@ interface SearchFiltersProps {
   /** Map of tag → count of notes with that tag */
   availableTags: Map<string, number>;
   onAddTag: (tag: string) => void;
+  /** Clear the search text and every selected tag at once */
+  onClearAll: () => void;
 }
 
 export function SearchFilters({
@@ -21,6 +23,7 @@ export function SearchFilters({
   onRemoveTag,
   availableTags,
   onAddTag,
+  onClearAll,
 }: SearchFiltersProps) {
   const [tagSearch, setTagSearch] = useState('');
 
@@ -93,10 +96,7 @@ export function SearchFilters({
           ))}
           {hasActiveFilters && (
             <button
-              onClick={() => {
-                onSearchChange('');
-                selectedTags.forEach(onRemoveTag);
-              }}
+              onClick={onClearAll}
               className="text-xs text-muted-foreground hover:text-foreground underline ml-1"
             >
               Clear all

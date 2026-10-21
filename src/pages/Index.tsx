@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useSeoMeta } from '@unhead/react';
 import { LoginArea } from '@/components/auth/LoginArea';
 import { NoteForm } from '@/components/notes/NoteForm';
@@ -17,8 +18,29 @@ const Index = () => {
   const { user } = useCurrentUser();
   const { toast } = useToast();
   const [showCuratedForm, setShowCuratedForm] = useState(false);
-  const [search, setSearch] = useState('');
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  // Search text (?q=) and tags (?tag=, repeatable) live in the URL, so Back
+  // from a paragraph returns to the same results and a filtered view can be shared
+  const [searchParams, setSearchParams] = useSearchParams();
+  const search = searchParams.get('q') ?? '';
+  const selectedTags = useMemo(() => searchParams.getAll('tag'), [searchParams]);
+
+  const setSearch = useCallback((value: string) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (value) next.set('q', value);
+      else next.delete('q');
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const setSelectedTags = useCallback((update: (prev: string[]) => string[]) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('tag');
+      for (const tag of update(prev.getAll('tag'))) next.append('tag', tag);
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
 
   const hasSearched = search.trim().length > 0 || selectedTags.length > 0;
   const isAppAuthor = user?.pubkey === APP_AUTHOR_PUBKEY;
@@ -71,11 +93,11 @@ const Index = () => {
 
   const handleAddTag = useCallback((tag: string) => {
     setSelectedTags((prev) => (prev.includes(tag) ? prev : [...prev, tag]));
-  }, []);
+  }, [setSelectedTags]);
 
   const handleRemoveTag = useCallback((tag: string) => {
     setSelectedTags((prev) => prev.filter((t) => t !== tag));
-  }, []);
+  }, [setSelectedTags]);
 
   const handleCreateNote = useCallback(
     async (data: { title: string; content: string; tags: string[]; order?: string }) => {
@@ -119,6 +141,7 @@ const Index = () => {
           onRemoveTag={handleRemoveTag}
           availableTags={tagCounts}
           onAddTag={handleAddTag}
+          onClearAll={() => setSearchParams({}, { replace: true })}
         />
 
         <div className="mt-6 space-y-6">

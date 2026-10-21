@@ -10,7 +10,7 @@ import { NoteForm } from '@/components/notes/NoteForm';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { ArrowLeft, Clock, User, Pencil } from 'lucide-react';
 import { APP_AUTHOR_PUBKEY } from '@/lib/appAuthor';
 import NotFound from './NotFound';
@@ -65,6 +65,10 @@ function StructuredNoteView({ id }: { id: string }) {
 
   const isOwner = user?.pubkey === APP_AUTHOR_PUBKEY;
 
+  // Back returns to the search results the note was opened from
+  const location = useLocation();
+  const backTo = `/${(location.state as { from?: string } | null)?.from ?? ''}`;
+
   useSeoMeta({
     title: note ? `${note.title} — cwtext` : 'Loading... — cwtext',
     description: note?.content.slice(0, 160) ?? 'A paragraph from the texts of C. G. Jung',
@@ -108,7 +112,7 @@ function StructuredNoteView({ id }: { id: string }) {
         <div className="container py-8 max-w-3xl mx-auto text-center">
           <p className="text-destructive text-lg">Note not found</p>
           <Button asChild variant="link" className="mt-4">
-            <Link to="/">Back to all notes</Link>
+            <Link to={backTo}>Back to all notes</Link>
           </Button>
         </div>
       </div>
@@ -129,7 +133,7 @@ function StructuredNoteView({ id }: { id: string }) {
         <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="container max-w-3xl mx-auto flex items-center h-16">
             <Button asChild variant="ghost" size="sm">
-              <Link to="/" className="flex items-center gap-2">
+              <Link to={backTo} className="flex items-center gap-2">
                 <ArrowLeft className="h-4 w-4" />
                 Back to notes
               </Link>
@@ -157,7 +161,7 @@ function StructuredNoteView({ id }: { id: string }) {
       <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container max-w-3xl mx-auto flex items-center justify-between h-16">
           <Button asChild variant="ghost" size="sm">
-            <Link to="/" className="flex items-center gap-2">
+            <Link to={backTo} className="flex items-center gap-2">
               <ArrowLeft className="h-4 w-4" />
               Back to notes
             </Link>
