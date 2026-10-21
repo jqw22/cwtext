@@ -24,7 +24,7 @@ export function SearchFilters({
 }: SearchFiltersProps) {
   const [tagSearch, setTagSearch] = useState('');
 
-  // Sort tags by count (most popular first), filter by tag search
+  // Sort tags alphabetically, filter by tag search
   const sortedTags = useMemo(() => {
     const entries = Array.from(availableTags.entries());
 
@@ -33,40 +33,15 @@ export function SearchFilters({
       ? entries.filter(([tag]) => tag.includes(tagSearch.toLowerCase()))
       : entries;
 
-    // Sort: selected first, then by count descending, then alphabetically
-    return filtered.sort((a, b) => {
-      const aSelected = selectedTags.includes(a[0]) ? -1 : 1;
-      const bSelected = selectedTags.includes(b[0]) ? -1 : 1;
-      if (aSelected !== bSelected) return aSelected - bSelected;
-      if (b[1] !== a[1]) return b[1] - a[1]; // higher count first
-      return a[0].localeCompare(b[0]);
-    });
-  }, [availableTags, tagSearch, selectedTags]);
+    // Sort alphabetically (A–Z); selected tags are shown in their own group
+    return filtered.sort((a, b) => a[0].localeCompare(b[0]));
+  }, [availableTags, tagSearch]);
 
   const totalTags = availableTags.size;
   const hasActiveFilters = selectedTags.length > 0 || search.trim().length > 0;
 
   return (
     <div className="space-y-4">
-      {/* Search input */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          value={search}
-          onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="Search notes by title, content, or tags..."
-          className="pl-10"
-        />
-        {search && (
-          <button
-            onClick={() => onSearchChange('')}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        )}
-      </div>
-
       {/* Active filters indicator */}
       {hasActiveFilters && (
         <div className="flex flex-wrap items-center gap-1.5 px-1">
@@ -188,6 +163,25 @@ export function SearchFilters({
           </div>
         </div>
       )}
+
+      {/* Search input */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          value={search}
+          onChange={(e) => onSearchChange(e.target.value)}
+          placeholder="Search notes by title, content, or tags..."
+          className="pl-10"
+        />
+        {search && (
+          <button
+            onClick={() => onSearchChange('')}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
     </div>
   );
 }
