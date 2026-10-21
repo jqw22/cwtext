@@ -163,7 +163,7 @@ const Index = () => {
                 <Search className="h-16 w-16 mx-auto mb-6 text-muted-foreground/20" />
                 <h2 className="text-2xl font-semibold mb-3">Find a passage</h2>
                 <p className="text-muted-foreground max-w-md mx-auto text-lg">
-                  Search by keyword or click a tag below to browse passages.
+                  Click a tag or search by keyword above to browse passages.
                 </p>
               </div>
             )}
