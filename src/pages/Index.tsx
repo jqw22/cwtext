@@ -23,11 +23,8 @@ const Index = () => {
   const hasSearched = search.trim().length > 0 || selectedTags.length > 0;
   const isAppAuthor = user?.pubkey === APP_AUTHOR_PUBKEY;
 
-  // Curated notes — always load for tag browser + search
-  const { data: notes, isLoading, error } = useStructuredNotes({
-    tags: selectedTags.length > 0 ? selectedTags : undefined,
-    search: search.trim() || undefined,
-  });
+  // All curated notes load once; search and tags filter them in the browser
+  const { data: notes, isLoading, error } = useStructuredNotes();
 
   const { mutateAsync: publishNote, isPending: isPublishing } = usePublishNote();
 
@@ -36,40 +33,18 @@ const Index = () => {
     description: 'Search, browse by tag, and export selected paragraphs from the texts of C. G. Jung.',
   });
 
-  // Compute tag counts from loaded notes + persist to localStorage
+  // Tag counts across the whole collection
   const tagCounts = useMemo(() => {
     const counts = new Map<string, number>();
-
-    if (notes) {
-      for (const note of notes) {
-        for (const tag of note.tags) {
-          counts.set(tag, (counts.get(tag) || 0) + 1);
-        }
+    for (const note of notes ?? []) {
+      for (const tag of note.tags) {
+        counts.set(tag, (counts.get(tag) || 0) + 1);
       }
     }
-
-    // Merge with cached counts from localStorage (for tags from past loads)
-    try {
-      const cached = localStorage.getItem('cwtext:tagCounts');
-      if (cached) {
-        const parsed = JSON.parse(cached) as [string, number][];
-        for (const [tag, count] of parsed) {
-          if (!counts.has(tag)) {
-            counts.set(tag, count);
-          }
-        }
-      }
-    } catch { /* ignore corrupt cache */ }
-
-    // Persist merged counts
-    try {
-      localStorage.setItem('cwtext:tagCounts', JSON.stringify([...counts]));
-    } catch { /* ignore storage full */ }
-
     return counts;
   }, [notes]);
 
-  // Filter and sort curated notes
+  // Filter curated notes (already sorted by order)
   const filteredNotes = useMemo(() => {
     if (!notes || !hasSearched) return [];
 
@@ -81,22 +56,15 @@ const Index = () => {
       );
     }
 
-    if (search.trim()) {
-      const q = search.toLowerCase();
+    const q = search.trim().toLowerCase();
+    if (q) {
       result = result.filter(
         (note) =>
           note.title.toLowerCase().includes(q) ||
           note.content.toLowerCase().includes(q) ||
-          note.tags.some((t) => t.includes(q)),
+          note.tags.some((t) => t.toLowerCase().includes(q)),
       );
     }
-
-    result = [...result].sort((a, b) => {
-      if (a.order === Infinity && b.order === Infinity) return 0;
-      if (a.order === Infinity) return 1;
-      if (b.order === Infinity) return -1;
-      return a.order - b.order;
-    });
 
     return result;
   }, [notes, selectedTags, search, hasSearched]);
@@ -149,7 +117,7 @@ const Index = () => {
           onSearchChange={setSearch}
           selectedTags={selectedTags}
           onRemoveTag={handleRemoveTag}
-          availableTags={tagCounts ?? new Map()}
+          availableTags={tagCounts}
           onAddTag={handleAddTag}
         />
 
@@ -185,7 +153,7 @@ const Index = () => {
                 onSubmit={handleCreateNote}
                 onCancel={() => setShowCuratedForm(false)}
                 isSubmitting={isPublishing}
-                availableTags={tagCounts ?? new Map()}
+                availableTags={tagCounts}
               />
             )}
 
