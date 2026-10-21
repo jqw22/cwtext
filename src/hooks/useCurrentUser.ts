@@ -2,6 +2,7 @@ import { type NLoginType, NUser, useNostrLogin } from '@nostrify/react/login';
 import { useNostr } from '@nostrify/react';
 import { useCallback, useMemo } from 'react';
 
+import { ExtensionSigner } from '@/lib/extensionSigner';
 import { useAuthor } from './useAuthor.ts';
 
 export function useCurrentUser() {
@@ -10,12 +11,14 @@ export function useCurrentUser() {
 
   const loginToUser = useCallback((login: NLoginType): NUser  => {
     switch (login.type) {
-      case 'nsec': // Nostr login with secret key
-        return NUser.fromNsecLogin(login);
+      // 'nsec' logins are not supported: the key would sit unencrypted in
+      // localStorage. LegacyKeyNotice removes any left from older versions.
       case 'bunker': // Nostr login with NIP-46 "bunker://" URI
         return NUser.fromBunkerLogin(login, nostr);
       case 'extension': // Nostr login with NIP-07 browser extension
-        return NUser.fromExtensionLogin(login);
+        // Bound to this login's pubkey, so it never signs as whichever
+        // other account the extension happens to have active.
+        return new NUser('extension', login.pubkey, new ExtensionSigner(login.pubkey));
       // Other login types can be defined here
       default:
         throw new Error(`Unsupported login type: ${login.type}`);
