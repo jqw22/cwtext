@@ -130,12 +130,13 @@ function generateODT(notes: StructuredNote[], title?: string, tags?: string[]): 
 
   // Generate the ZIP as a Blob using fflate
   const zipped = zipSync({
-    'mimetype': strToU8('application/vnd.oasis.opendocument.text'),
+    // ODF requires the mimetype entry to be stored uncompressed
+    'mimetype': [strToU8('application/vnd.oasis.opendocument.text'), { level: 0 }],
     'META-INF/manifest.xml': strToU8(manifest),
     'meta.xml': strToU8(meta),
     'styles.xml': strToU8(styles),
     'content.xml': strToU8(contentXml),
-  }, { level: { 'mimetype': 0 } });
+  });
 
   return new Blob([zipped], { type: 'application/vnd.oasis.opendocument.text' });
 }

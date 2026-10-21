@@ -1,4 +1,4 @@
-import { type NostrEvent } from '@nostrify/nostrify';
+import type { NostrEvent, NostrFilter } from '@nostrify/nostrify';
 import { useNostr } from '@nostrify/react';
 import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -69,7 +69,7 @@ export function useTagCounts() {
   return useQuery({
     queryKey: ['nostr', 'tags', APP_AUTHOR_PUBKEY],
     queryFn: async () => {
-      const filter: Record<string, unknown> = {
+      const filter: NostrFilter = {
         kinds: [NOTE_KIND],
         authors: [APP_AUTHOR_PUBKEY],
         limit: 1000,
@@ -118,7 +118,7 @@ export function useStructuredNotes(options: UseNotesOptions = {}) {
   return useQuery({
     queryKey: ['nostr', 'notes', APP_AUTHOR_PUBKEY, tags, search, limit],
     queryFn: async () => {
-      const filter: Record<string, unknown> = {
+      const filter: NostrFilter = {
         kinds: [NOTE_KIND],
         authors: [APP_AUTHOR_PUBKEY],
         limit: limit * 2, // Fetch extra for client-side search filtering
@@ -158,7 +158,7 @@ export function useStructuredNote(id: string) {
   return useQuery({
     queryKey: ['nostr', 'note', APP_AUTHOR_PUBKEY, id],
     queryFn: async () => {
-      const filter: Record<string, unknown> = {
+      const filter: NostrFilter = {
         kinds: [NOTE_KIND],
         authors: [APP_AUTHOR_PUBKEY],
         '#d': [id],

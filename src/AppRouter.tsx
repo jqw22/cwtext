@@ -5,8 +5,8 @@ import Index from "./pages/Index";
 import { NIP19Page } from "./pages/NIP19Page";
 import NotFound from "./pages/NotFound";
 
-// GitHub Pages serves at /cwtext/ — Router needs to know this
-const basename = window.location.hostname.includes('github.io') ? '/cwtext' : undefined;
+// Match the Vite `base` (/cwtext/) so routes resolve the same in dev, preview and on GitHub Pages
+const basename = import.meta.env.BASE_URL.replace(/\/$/, '') || undefined;
 
 export function AppRouter() {
   return (
