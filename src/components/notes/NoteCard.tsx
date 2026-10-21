@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { nip19 } from 'nostr-tools';
 import type { StructuredNote } from '@/hooks/useStructuredNotes';
 
@@ -7,6 +7,7 @@ interface NoteCardProps {
 }
 
 function NoteCard({ note }: NoteCardProps) {
+  const location = useLocation();
   const naddr = nip19.naddrEncode({
     kind: 30023,
     pubkey: note.pubkey,
@@ -14,7 +15,7 @@ function NoteCard({ note }: NoteCardProps) {
   });
 
   return (
-    <Link to={`/${naddr}`} className="block group">
+    <Link to={`/${naddr}`} state={{ from: location.search }} className="block group">
       <article className="py-5 border-b border-border/40 last:border-b-0 group-hover:bg-muted/20 -mx-4 px-4 rounded-lg transition-colors">
         <h2 className="text-base font-bold text-foreground mb-3">
           <span className="text-muted-foreground font-normal">Para. </span>
