@@ -67,7 +67,7 @@ function StructuredNoteView({ id }: { id: string }) {
 
   useSeoMeta({
     title: note ? `${note.title} — cwtext` : 'Loading... — cwtext',
-    description: note?.content.slice(0, 160) ?? 'Structured text note',
+    description: note?.content.slice(0, 160) ?? 'A paragraph from the texts of C. G. Jung',
   });
 
   const handleEdit = async (data: { title: string; content: string; tags: string[]; order?: string }) => {
