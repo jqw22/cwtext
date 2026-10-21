@@ -51,7 +51,7 @@ const Index = () => {
   const { mutateAsync: publishNote, isPending: isPublishing } = usePublishNote();
 
   useSeoMeta({
-    title: 'cwtext — Jung Texts',
+    title: 'Selected Texts of C.G. Jung',
     description: 'Search, browse by tag, and export selected paragraphs from the texts of C. G. Jung.',
   });
 
@@ -120,10 +120,7 @@ const Index = () => {
         <div className="container flex items-center justify-between h-16">
           <div className="flex items-center gap-3">
             <img src={`${import.meta.env.BASE_URL}maze.svg`} alt="" className="h-6 w-6" />
-            <h1 className="text-xl font-bold">cwtext</h1>
-            <span className="hidden sm:inline text-xs text-muted-foreground">
-              — Selected texts of C. G. Jung
-            </span>
+            <h1 className="text-xl font-bold">Selected Texts of C.G. Jung</h1>
           </div>
           <div className="flex items-center gap-3">
             <ExportODTButton notes={filteredNotes} title="cwtext_export" filterTags={selectedTags} />
