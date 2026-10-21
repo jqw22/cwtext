@@ -2,6 +2,7 @@ import { useNostr } from '@nostrify/react';
 import { useNostrLogin } from '@nostrify/react/login';
 import { useQuery } from '@tanstack/react-query';
 import { NSchema as n, NostrEvent, NostrMetadata } from '@nostrify/nostrify';
+import { newestEvent } from '@/lib/profile';
 
 export interface Account {
   id: string;
@@ -15,7 +16,9 @@ export function useLoggedInAccounts() {
   const { logins, setLogin, removeLogin } = useNostrLogin();
 
   const { data: authors = [], isLoading } = useQuery({
-    queryKey: ['nostr', 'logins', logins.map((l) => l.id).join(';')],
+    // Sorted so switching accounts (which reorders logins) reuses the cache
+    // instead of briefly showing the new current account with no profile.
+    queryKey: ['nostr', 'logins', logins.map((l) => l.id).sort().join(';')],
     queryFn: async () => {
       const events = await nostr.query(
         [{ kinds: [0], authors: logins.map((l) => l.pubkey) }],
@@ -23,7 +26,7 @@ export function useLoggedInAccounts() {
       );
 
       return logins.map(({ id, pubkey }): Account => {
-        const event = events.find((e) => e.pubkey === pubkey);
+        const event = newestEvent(events, pubkey);
         try {
           const metadata = n.json().pipe(n.metadata()).parse(event?.content);
           return { id, pubkey, metadata, event };
