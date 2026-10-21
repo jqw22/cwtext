@@ -56,108 +56,98 @@ function parseNote(event: NostrEvent): StructuredNote {
   };
 }
 
+/** Events requested per page. Relays may cap responses lower than this. */
+const PAGE_SIZE = 500;
+
+/** Safety cap on pages fetched, so a misbehaving relay can't loop forever */
+const MAX_PAGES = 50;
+
 /**
- * Fetch tag counts for the tag browser. Always enabled, lightweight query.
- * Fetches a set of recent notes to extract tag metadata for the UI.
+ * Fetch every curated note by the app author, paging back in time with
+ * `until` so collections larger than one relay response are complete.
+ * Superseded versions of the same `d` tag are collapsed to the newest.
  */
-export function useTagCounts() {
-  const { nostr } = useNostr();
+export async function fetchAllNotes(
+  queryNostr: { query: (filters: NostrFilter[], opts?: { signal?: AbortSignal }) => Promise<NostrEvent[]> },
+  signal: AbortSignal,
+): Promise<NostrEvent[]> {
+  const seen = new Set<string>();
+  const latest = new Map<string, NostrEvent>();
+  let until: number | undefined;
 
-  // Use fixed relay group so tag counts are consistent regardless of login
-  const queryNostr = useMemo(() => nostr.group(CURATED_RELAYS), [nostr]);
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const filter: NostrFilter = {
+      kinds: [NOTE_KIND],
+      authors: [APP_AUTHOR_PUBKEY],
+      limit: PAGE_SIZE,
+    };
+    if (until !== undefined) filter.until = until;
 
-  return useQuery({
-    queryKey: ['nostr', 'tags', APP_AUTHOR_PUBKEY],
-    queryFn: async () => {
-      const filter: NostrFilter = {
-        kinds: [NOTE_KIND],
-        authors: [APP_AUTHOR_PUBKEY],
-        limit: 1000,
-      };
+    const events = await queryNostr.query([filter], { signal });
 
-      const events = await queryNostr.query([filter], {
-        signal: AbortSignal.timeout(15000),
-      });
+    let added = 0;
+    let oldest = Infinity;
+    for (const event of events) {
+      oldest = Math.min(oldest, event.created_at);
+      if (seen.has(event.id)) continue;
+      seen.add(event.id);
+      added++;
 
-      const counts = new Map<string, number>();
-      for (const event of events) {
-        for (const tag of event.tags) {
-          if (tag[0] === 't' && tag[1]) {
-            counts.set(tag[1], (counts.get(tag[1]) || 0) + 1);
-          }
-        }
+      const d = event.tags.find(([n]) => n === 'd')?.[1] ?? event.id;
+      const current = latest.get(d);
+      if (!current || event.created_at > current.created_at) {
+        latest.set(d, event);
       }
-      return counts;
-    },
-    staleTime: 10 * 60 * 1000, // Cache tags for 10 minutes
-  });
+    }
+
+    // `until` is inclusive, so a page with nothing new means we've reached the end
+    if (added === 0) break;
+    until = oldest;
+  }
+
+  return [...latest.values()];
 }
 
-interface UseNotesOptions {
-  /** Filter by category tags */
-  tags?: string[];
-  /** Search text in title/content */
-  search?: string;
-  /** Maximum notes to fetch */
-  limit?: number;
-  /** Only fetch when true (defaults to true) */
-  enabled?: boolean;
+/** Sort by the `order` tag, notes without one last */
+function byOrder(a: StructuredNote, b: StructuredNote): number {
+  if (a.order === Infinity && b.order === Infinity) return 0;
+  if (a.order === Infinity) return 1;
+  if (b.order === Infinity) return -1;
+  return a.order - b.order;
 }
 
 /**
- * Fetch structured text notes. Always scoped to the app author.
- * Use `enabled` to gate the query (e.g. only fetch after user searches).
+ * Fetch all curated notes once, sorted by order. Search and tag filtering
+ * happen in the browser, so typing never triggers a relay query.
  */
-export function useStructuredNotes(options: UseNotesOptions = {}) {
+export function useStructuredNotes() {
   const { nostr } = useNostr();
-  const { tags, search, limit = 500, enabled = true } = options;
 
   // Use fixed relay group so curated notes are consistent regardless of login
   const queryNostr = useMemo(() => nostr.group(CURATED_RELAYS), [nostr]);
 
   return useQuery({
-    queryKey: ['nostr', 'notes', APP_AUTHOR_PUBKEY, tags, search, limit],
-    queryFn: async () => {
-      const filter: NostrFilter = {
-        kinds: [NOTE_KIND],
-        authors: [APP_AUTHOR_PUBKEY],
-        limit: limit * 2, // Fetch extra for client-side search filtering
-      };
-
-      if (tags && tags.length > 0) {
-        filter['#t'] = tags;
-      }
-
-      const events = await queryNostr.query([filter], {
-        signal: AbortSignal.timeout(15000),
-      });
-
-      let notes = events.map(parseNote);
-
-      // Client-side search filter (relays don't support full-text)
-      if (search) {
-        const q = search.toLowerCase();
-        notes = notes.filter(
-          (n) =>
-            n.title.toLowerCase().includes(q) ||
-            n.content.toLowerCase().includes(q) ||
-            n.tags.some((t) => t.toLowerCase().includes(q)),
-        );
-      }
-
-      return notes.slice(0, limit);
+    queryKey: ['nostr', 'notes', APP_AUTHOR_PUBKEY],
+    queryFn: async ({ signal }) => {
+      const events = await fetchAllNotes(
+        queryNostr,
+        AbortSignal.any([signal, AbortSignal.timeout(60000)]),
+      );
+      return events.map(parseNote).sort(byOrder);
     },
-    enabled,
+    staleTime: 10 * 60 * 1000,
   });
 }
 
 /** Fetch a single structured note by its d-tag identifier (always scoped to the app author) */
 export function useStructuredNote(id: string) {
   const { nostr } = useNostr();
+  const queryClient = useQueryClient();
+  const queryNostr = useMemo(() => nostr.group(CURATED_RELAYS), [nostr]);
 
-  return useQuery({
+  return useQuery<StructuredNote | null>({
     queryKey: ['nostr', 'note', APP_AUTHOR_PUBKEY, id],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const filter: NostrFilter = {
         kinds: [NOTE_KIND],
         authors: [APP_AUTHOR_PUBKEY],
@@ -165,13 +155,18 @@ export function useStructuredNote(id: string) {
         limit: 1,
       };
 
-      const events = await nostr.query([filter], {
-        signal: AbortSignal.timeout(5000),
+      const events = await queryNostr.query([filter], {
+        signal: AbortSignal.any([signal, AbortSignal.timeout(10000)]),
       });
 
       if (events.length === 0) return null;
-      return parseNote(events[0]);
+      const newest = events.reduce((a, b) => (b.created_at > a.created_at ? b : a));
+      return parseNote(newest);
     },
+    // Show the copy from the loaded list instantly while the fresh one loads
+    placeholderData: () => queryClient
+      .getQueryData<StructuredNote[]>(['nostr', 'notes', APP_AUTHOR_PUBKEY])
+      ?.find((n) => n.id === id),
     enabled: !!id,
   });
 }
@@ -228,8 +223,9 @@ export function usePublishNote() {
 
       return parseNote(event);
     },
-    onSuccess: () => {
+    onSuccess: (note) => {
       queryClient.invalidateQueries({ queryKey: ['nostr', 'notes'] });
+      queryClient.invalidateQueries({ queryKey: ['nostr', 'note', APP_AUTHOR_PUBKEY, note.id] });
     },
   });
 }
