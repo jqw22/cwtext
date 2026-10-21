@@ -1,4 +1,5 @@
-import { ChevronDown, LogOut, UserIcon, UserPlus } from 'lucide-react';
+import { Check, ChevronDown, Copy, LogOut, UserIcon, UserPlus } from 'lucide-react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { nip19 } from 'nostr-tools';
 import {
@@ -14,6 +15,7 @@ import { useLoggedInAccounts, type Account } from '@/hooks/useLoggedInAccounts';
 import { useNostrLogin } from '@nostrify/react/login';
 import { toast } from '@/hooks/useToast';
 import { getExtensionPubkey } from '@/lib/extensionSigner';
+import { getDisplayName as profileName, shortNpub } from '@/lib/profile';
 
 interface AccountSwitcherProps {
   onAddAccountClick: () => void;
@@ -23,8 +25,24 @@ export function AccountSwitcher({ onAddAccountClick }: AccountSwitcherProps) {
   const { currentUser, otherUsers, isLoading, setLogin, removeLogin } = useLoggedInAccounts();
 
   const { logins } = useNostrLogin();
+  const [copied, setCopied] = useState(false);
 
   if (!currentUser) return null;
+
+  const currentNpub = nip19.npubEncode(currentUser.pubkey);
+
+  const copyNpub = async (e: React.MouseEvent) => {
+    // Keep the menu open and don't follow the profile link.
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(currentNpub);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      toast({ title: 'Could not copy', description: currentNpub });
+    }
+  };
 
   // An extension account can only be used while it is the extension's active
   // account; the app can't switch the extension, so ask the user to.
@@ -43,13 +61,12 @@ export function AccountSwitcher({ onAddAccountClick }: AccountSwitcherProps) {
     setLogin(account.id);
   };
 
-  const getDisplayName = (account: Account): string => {
-    return account.metadata.name ?? 'Anonymous';
-  }
+  const getDisplayName = (account: Account): string => profileName(account.metadata, account.pubkey);
 
   // While the metadata query is in-flight and we don't yet have a name,
-  // we don't want to flash a generated animal name / its first letter.
-  const isCurrentUserPending = isLoading && !currentUser.metadata.name;
+  // we don't want to flash the npub fallback / its first letter.
+  const hasName = (account: Account) => Boolean(account.metadata.display_name || account.metadata.name);
+  const isCurrentUserPending = isLoading && !hasName(currentUser);
 
   return (
     <DropdownMenu modal={false}>
@@ -73,7 +90,7 @@ export function AccountSwitcher({ onAddAccountClick }: AccountSwitcherProps) {
       </DropdownMenuTrigger>
       <DropdownMenuContent className='w-56 p-2 animate-scale-in'>
         <DropdownMenuItem asChild className='flex items-center gap-2 cursor-pointer p-2 rounded-md'>
-          <Link to={`/${nip19.npubEncode(currentUser.pubkey)}`}>
+          <Link to={`/${currentNpub}`}>
             <Avatar className='w-8 h-8'>
               <AvatarImage
                 src={currentUser.metadata.picture}
@@ -91,13 +108,23 @@ export function AccountSwitcher({ onAddAccountClick }: AccountSwitcherProps) {
               {isCurrentUserPending ? (
                 <Skeleton className='h-4 w-24' />
               ) : (
-                <p className='text-sm font-medium'>{getDisplayName(currentUser)}</p>
+                <p className='text-sm font-medium truncate'>{getDisplayName(currentUser)}</p>
               )}
+              <button
+                type='button'
+                onClick={copyNpub}
+                title={`Copy ${currentNpub}`}
+                aria-label='Copy npub'
+                className='flex items-center gap-1 text-xs text-muted-foreground font-mono hover:text-foreground'
+              >
+                {shortNpub(currentUser.pubkey)}
+                {copied ? <Check className='w-3 h-3' /> : <Copy className='w-3 h-3' />}
+              </button>
             </div>
           </Link>
         </DropdownMenuItem>
         {otherUsers.map((user) => {
-          const isPending = isLoading && !user.metadata.name;
+          const isPending = isLoading && !hasName(user);
           return (
             <DropdownMenuItem
               key={user.id}
@@ -121,8 +148,9 @@ export function AccountSwitcher({ onAddAccountClick }: AccountSwitcherProps) {
                 {isPending ? (
                   <Skeleton className='h-4 w-24' />
                 ) : (
-                  <p className='text-sm font-medium'>{getDisplayName(user)}</p>
+                  <p className='text-sm font-medium truncate'>{getDisplayName(user)}</p>
                 )}
+                <p className='text-xs text-muted-foreground font-mono'>{shortNpub(user.pubkey)}</p>
               </div>
             </DropdownMenuItem>
           );

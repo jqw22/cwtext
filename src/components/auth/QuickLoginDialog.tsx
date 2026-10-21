@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
-import { nip19 } from 'nostr-tools';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -12,6 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuthor } from '@/hooks/useAuthor';
 import { useLoginActions } from '@/hooks/useLoginActions';
+import { getDisplayName, shortNpub } from '@/lib/profile';
 
 interface QuickLoginDialogProps {
   /** Whether the dialog is open. */
@@ -41,8 +41,7 @@ export function QuickLoginDialog({
   const [error, setError] = useState('');
 
   const metadata = author.data?.metadata;
-  const displayName =
-    metadata?.display_name || metadata?.name || genericName(pubkey);
+  const displayName = getDisplayName(metadata, pubkey);
   const picture = metadata?.picture;
 
   const handleLogin = async () => {
@@ -79,6 +78,7 @@ export function QuickLoginDialog({
                 </AvatarFallback>
               </Avatar>
               <p className="text-lg font-semibold leading-none">{displayName}</p>
+              <p className="text-xs text-muted-foreground font-mono">{shortNpub(pubkey)}</p>
             </>
           )}
         </div>
@@ -117,14 +117,4 @@ export function QuickLoginDialog({
       </DialogContent>
     </Dialog>
   );
-}
-
-/** Fallback display name derived from the npub when no metadata is available. */
-function genericName(pubkey: string): string {
-  try {
-    const npub = nip19.npubEncode(pubkey);
-    return `${npub.slice(0, 10)}…${npub.slice(-4)}`;
-  } catch {
-    return 'Nostr user';
-  }
 }
