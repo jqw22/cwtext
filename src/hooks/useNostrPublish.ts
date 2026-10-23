@@ -8,7 +8,11 @@ import type { NostrEvent } from "@nostrify/nostrify";
 type EventTemplate = Pick<NostrEvent, 'kind' | 'content'> &
   Partial<Pick<NostrEvent, 'tags' | 'created_at'>>;
 
-export function useNostrPublish(): UseMutationResult<
+/**
+ * Sign and publish an event. By default it goes to the user's write relays;
+ * pass `relays` to send it to a fixed set instead.
+ */
+export function useNostrPublish(opts?: { relays?: string[] }): UseMutationResult<
   NostrEvent,
   Error,
   EventTemplate
@@ -33,7 +37,7 @@ export function useNostrPublish(): UseMutationResult<
           created_at: t.created_at ?? Math.floor(Date.now() / 1000),
         });
 
-        await nostr.event(event, { signal: AbortSignal.timeout(5000) });
+        await nostr.event(event, { signal: AbortSignal.timeout(5000), relays: opts?.relays });
         return event;
       } else {
         throw new Error("User is not logged in");
