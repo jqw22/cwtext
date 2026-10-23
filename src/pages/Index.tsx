@@ -232,10 +232,7 @@ const Index = () => {
 
             {hasSearched && !isLoading && !error && filteredNotes.length > 0 && (
               <p className="text-center text-xs text-muted-foreground pb-8">
-                Powered by Nostr · Vibed with{' '}
-                <a href="https://shakespeare.diy" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">
-                  Shakespeare
-                </a>
+                Powered by Nostr
               </p>
             )}
         </div>
