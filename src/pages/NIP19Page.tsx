@@ -177,7 +177,6 @@ function StructuredNoteView({ id }: { id: string }) {
 
       <article className="container max-w-3xl mx-auto py-8 px-4">
         <h1 className="text-3xl font-bold leading-tight mb-4">
-          <span className="text-muted-foreground font-normal">Para. </span>
           {note.title}
         </h1>
 
@@ -201,7 +200,7 @@ function StructuredNoteView({ id }: { id: string }) {
           </div>
         )}
 
-        <div className="mb-12">
+        <div className="mb-12 max-w-prose">
           {note.content.split('\n').map((line, i) => (
             <p key={i} className="mb-3 leading-relaxed">{line || '\u00A0'}</p>
           ))}
