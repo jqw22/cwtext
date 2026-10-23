@@ -119,7 +119,7 @@ const Index = () => {
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex items-center justify-between h-16">
           <div className="flex items-center gap-3">
-            <img src={`${import.meta.env.BASE_URL}maze.svg`} alt="" className="h-6 w-6" />
+            <img src={`${import.meta.env.BASE_URL}icon-192.png`} alt="" className="h-6 w-6" />
             <h1 className="text-xl font-bold">Selected Texts of C.G. Jung</h1>
           </div>
           <div className="flex items-center gap-3">
