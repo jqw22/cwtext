@@ -46,13 +46,13 @@ const Index = () => {
   const isAppAuthor = user?.pubkey === APP_AUTHOR_PUBKEY;
 
   // All curated notes load once; search and tags filter them in the browser
-  const { data: notes, isLoading, error } = useStructuredNotes();
+  const { data: notes, isLoading, error, refetch } = useStructuredNotes();
 
   const { mutateAsync: publishNote, isPending: isPublishing } = usePublishNote();
 
   useSeoMeta({
     title: 'Selected Texts of C.G. Jung',
-    description: 'Search, browse by tag, and export selected paragraphs from the texts of C. G. Jung.',
+    description: 'Search, browse by text, and export selected paragraphs from the texts of C. G. Jung.',
   });
 
   // Tag counts across the whole collection
@@ -139,6 +139,8 @@ const Index = () => {
           availableTags={tagCounts}
           onAddTag={handleAddTag}
           onClearAll={() => setSearchParams({}, { replace: true })}
+          isLoading={isLoading}
+          onRetry={error ? () => refetch() : undefined}
         />
 
         <div className="mt-6 space-y-6">
@@ -152,7 +154,7 @@ const Index = () => {
                 </p>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  Use the search bar above or click a tag to find passages
+                  Use the search bar above or click a text to find passages
                 </p>
               )}
               {isAppAuthor && (
@@ -183,7 +185,7 @@ const Index = () => {
                 <Search className="h-16 w-16 mx-auto mb-6 text-muted-foreground/20" />
                 <h2 className="text-2xl font-semibold mb-3">Find a passage</h2>
                 <p className="text-muted-foreground max-w-md mx-auto text-lg">
-                  Click a tag or search by keyword above to browse passages.
+                  Click a text or search by keyword above to browse passages.
                 </p>
               </div>
             )}

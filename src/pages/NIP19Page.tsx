@@ -79,7 +79,7 @@ function StructuredNoteView({ id }: { id: string }) {
     try {
       await publishNote({ ...data, dtag: note.id });
       setEditing(false);
-      toast({ title: 'Note updated', description: 'Tags and content saved to Nostr.' });
+      toast({ title: 'Note updated', description: 'Texts and content saved to Nostr.' });
     } catch (err) {
       toast({
         title: 'Update failed',

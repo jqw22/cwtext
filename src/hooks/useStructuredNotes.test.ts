@@ -53,6 +53,26 @@ describe('fetchAllNotes', () => {
     expect(result).toHaveLength(12);
   });
 
+  it('reports notes as they arrive, before a slow relay finishes', async () => {
+    const events = [note(1, 100), note(2, 200)];
+    // Never answers until the fetch is aborted, like an unreachable relay
+    const hanging = {
+      query: (_: NostrFilter[], opts?: { signal?: AbortSignal }) =>
+        new Promise<NostrEvent[]>((_, reject) => opts?.signal?.addEventListener('abort', reject)),
+    };
+    const controller = new AbortController();
+    let first: NostrEvent[] | undefined;
+    const done = fetchAllNotes(
+      [hanging, fakeRelay(events, 10)],
+      controller.signal,
+      (partial) => { first ??= partial; },
+    );
+    await new Promise((r) => setTimeout(r, 20));
+    expect(first).toHaveLength(2);
+    controller.abort();
+    expect(await done).toHaveLength(2);
+  });
+
   it('keeps notes from other relays when one relay fails', async () => {
     const events = [note(1, 100), note(2, 200)];
     const broken = { query: () => Promise.reject(new Error('Subscription closed')) };
