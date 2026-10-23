@@ -16,12 +16,11 @@ function NoteCard({ note }: NoteCardProps) {
 
   return (
     <Link to={`/${naddr}`} state={{ from: location.search }} className="block group">
-      <article className="py-5 border-b border-border/40 last:border-b-0 group-hover:bg-muted/20 -mx-4 px-4 rounded-lg transition-colors">
-        <h2 className="text-base font-bold text-foreground mb-3">
-          <span className="text-muted-foreground font-normal">Para. </span>
+      <article className="flex gap-4 py-5 border-b border-border/40 last:border-b-0 group-hover:bg-muted/20 -mx-4 px-4 rounded-lg transition-colors">
+        <h2 className="w-12 shrink-0 text-right text-sm font-bold text-muted-foreground tabular-nums leading-relaxed">
           {note.title}
         </h2>
-        <div className="text-sm text-foreground/80 whitespace-pre-line leading-relaxed">
+        <div className="max-w-prose text-sm text-foreground/80 whitespace-pre-line leading-relaxed">
           {note.content}
         </div>
       </article>
