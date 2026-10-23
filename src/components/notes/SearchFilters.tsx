@@ -100,10 +100,10 @@ export function SearchFilters({
           {/* Selected tags always shown at top */}
           {selectedTags.length > 0 && (
             <div>
-              <p className="text-[10px] uppercase tracking-widest text-muted-foreground/60 mb-1.5 text-center">
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground/60 mb-1.5">
                 Selected
               </p>
-              <div className="flex flex-wrap justify-center gap-1.5">
+              <div className="flex flex-wrap gap-1.5">
                 {sortedTags
                   .filter(([t]) => selectedTags.includes(t))
                   .map(([tag, count]) => (
@@ -125,14 +125,14 @@ export function SearchFilters({
           {/* All tags */}
           <div>
             {selectedTags.length > 0 && (
-              <p className="text-[10px] uppercase tracking-widest text-muted-foreground/60 mb-1.5 text-center">
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground/60 mb-1.5">
                 All Texts
               </p>
             )}
             {sortedTags.filter(([t]) => !selectedTags.includes(t)).length === 0 ? (
-              <p className="text-xs text-muted-foreground/60 italic text-center">No other texts</p>
+              <p className="text-xs text-muted-foreground/60 italic">No other texts</p>
             ) : (
-              <div className="flex flex-wrap justify-center gap-1.5 max-h-48 overflow-y-auto">
+              <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto">
                 {sortedTags
                   .filter(([t]) => !selectedTags.includes(t))
                   .map(([tag, count]) => (
