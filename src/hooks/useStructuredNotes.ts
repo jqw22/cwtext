@@ -33,6 +33,14 @@ export interface StructuredNote {
   order: number;
 }
 
+/**
+ * Normalise a `t` tag so copies that differ only in case or spacing
+ * (stray, doubled or non-breaking spaces) count as the same tag.
+ */
+export function normalizeTag(tag: string): string {
+  return tag.replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
 /** Parse a NostrEvent into a StructuredNote */
 function parseNote(event: NostrEvent): StructuredNote {
   const getTag = (name: string): string | undefined =>
@@ -47,7 +55,7 @@ function parseNote(event: NostrEvent): StructuredNote {
     event,
     title: getTag('title') ?? 'Untitled',
     content: event.content ?? '',
-    tags: getAllTags('t'),
+    tags: [...new Set(getAllTags('t').map(normalizeTag).filter(Boolean))],
     publishedAt: publishedAtTag ? Number(publishedAtTag) : undefined,
     id: getTag('d') ?? event.id,
     pubkey: event.pubkey,
@@ -242,7 +250,7 @@ export function usePublishNote() {
       // Category tags
       for (const tag of tags) {
         if (tag.trim()) {
-          noteTags.push(['t', tag.trim().toLowerCase()]);
+          noteTags.push(['t', normalizeTag(tag)]);
         }
       }
 

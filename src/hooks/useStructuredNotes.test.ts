@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { NostrEvent, NostrFilter } from '@nostrify/nostrify';
-import { fetchAllNotes } from './useStructuredNotes';
+import { fetchAllNotes, normalizeTag } from './useStructuredNotes';
 import { APP_AUTHOR_PUBKEY } from '@/lib/appAuthor';
 
 function note(i: number, createdAt: number, d = `d${i}`): NostrEvent {
@@ -62,5 +62,14 @@ describe('fetchAllNotes', () => {
 
   it('throws when no relay returns any notes, so the empty result is retried', async () => {
     await expect(fetchAllNotes([fakeRelay([], 10)], AbortSignal.timeout(1000))).rejects.toThrow();
+  });
+});
+
+describe('normalizeTag', () => {
+  it('treats tags that differ only in case or spacing as the same', () => {
+    const want = '9.1 the psychological aspects of the kore';
+    expect(normalizeTag('9.1 The Psychological Aspects of the Kore')).toBe(want);
+    expect(normalizeTag(' 9.1 the psychological  aspects of the kore ')).toBe(want);
+    expect(normalizeTag('9.1\u00a0the psychological aspects of the kore')).toBe(want);
   });
 });

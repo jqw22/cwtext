@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Plus, PenLine, Search } from 'lucide-react';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
-import { useStructuredNotes, usePublishNote } from '@/hooks/useStructuredNotes';
+import { useStructuredNotes, usePublishNote, normalizeTag } from '@/hooks/useStructuredNotes';
 import { useToast } from '@/hooks/useToast';
 import { APP_AUTHOR_PUBKEY } from '@/lib/appAuthor';
 
@@ -22,7 +22,7 @@ const Index = () => {
   // from a paragraph returns to the same results and a filtered view can be shared
   const [searchParams, setSearchParams] = useSearchParams();
   const search = searchParams.get('q') ?? '';
-  const selectedTags = useMemo(() => searchParams.getAll('tag'), [searchParams]);
+  const selectedTags = useMemo(() => searchParams.getAll('tag').map(normalizeTag), [searchParams]);
 
   const setSearch = useCallback((value: string) => {
     setSearchParams((prev) => {
