@@ -13,7 +13,7 @@ interface NoteFormProps {
   initialContent?: string;
   initialTags?: string[];
   initialOrder?: string;
-  /** Existing tags from all notes, with counts — shown as suggestions */
+  /** Existing texts from all notes, with counts — shown as suggestions */
   availableTags?: Map<string, number>;
   onSubmit: (data: {
     title: string;
@@ -168,7 +168,7 @@ export function NoteForm({
 
           {/* Tags */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">Tags</label>
+            <label className="text-sm font-medium">Texts</label>
 
             {/* Type a new tag */}
             <div className="flex gap-2">
@@ -176,7 +176,7 @@ export function NoteForm({
                 value={tagInput}
                 onChange={(e) => setTagInput(e.target.value)}
                 onKeyDown={handleTagKeyDown}
-                placeholder="Type a new tag and press Enter..."
+                placeholder="Type a new text and press Enter..."
                 disabled={isSubmitting}
                 className="flex-1"
               />
@@ -227,7 +227,7 @@ export function NoteForm({
                       <Input
                         value={tagSearch}
                         onChange={(e) => setTagSearch(e.target.value)}
-                        placeholder="Search tags..."
+                        placeholder="Search texts..."
                         className="h-6 text-[11px] pl-5"
                       />
                     </div>

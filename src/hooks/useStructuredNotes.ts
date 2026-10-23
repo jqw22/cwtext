@@ -1,6 +1,6 @@
 import type { NostrEvent, NostrFilter } from '@nostrify/nostrify';
 import { useNostr } from '@nostrify/react';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNostrPublish } from './useNostrPublish';
 import { APP_AUTHOR_PUBKEY } from '@/lib/appAuthor';
@@ -86,6 +86,7 @@ async function fetchFromRelay(
   relay: Queryable,
   signal: AbortSignal,
   onEvent: (event: NostrEvent) => void,
+  onPage: () => void,
 ): Promise<void> {
   const seen = new Set<string>();
   let until: number | undefined;
@@ -119,6 +120,7 @@ async function fetchFromRelay(
 
     // `until` is inclusive, so a page with nothing new means we've reached the end
     if (added === 0) return;
+    onPage();
     until = oldest;
   }
 }
@@ -129,12 +131,15 @@ async function fetchFromRelay(
  * response are complete. Relays are not raced against each other: a fast
  * relay that holds none of the notes can't cut the others off.
  * Superseded versions of the same `d` tag are collapsed to the newest.
+ * `onProgress` gets the notes so far after every page, so the page can show
+ * them without waiting for slow or unreachable relays to time out.
  * Throws if no relay returned anything, so an empty result is retried
  * rather than cached.
  */
 export async function fetchAllNotes(
   relays: Queryable[],
   signal: AbortSignal,
+  onProgress?: (events: NostrEvent[]) => void,
 ): Promise<NostrEvent[]> {
   const latest = new Map<string, NostrEvent>();
 
@@ -146,7 +151,9 @@ export async function fetchAllNotes(
     }
   };
 
-  await Promise.all(relays.map((relay) => fetchFromRelay(relay, signal, keep)));
+  const progress = () => onProgress?.([...latest.values()]);
+
+  await Promise.all(relays.map((relay) => fetchFromRelay(relay, signal, keep, progress)));
 
   if (latest.size === 0) {
     throw new Error('No notes received from any relay');
@@ -163,26 +170,65 @@ function byOrder(a: StructuredNote, b: StructuredNote): number {
   return a.order - b.order;
 }
 
+const NOTES_KEY = ['nostr', 'notes', APP_AUTHOR_PUBKEY];
+
+/** localStorage key for the last full set of curated notes */
+const CACHE_KEY = 'cwtext:notes';
+
+function readCache(): { events: NostrEvent[]; savedAt: number } | undefined {
+  try {
+    const cached = JSON.parse(localStorage.getItem(CACHE_KEY) ?? 'null');
+    if (Array.isArray(cached?.events) && typeof cached.savedAt === 'number') return cached;
+  } catch {
+    // Unreadable cache: load from the relays as if there were none
+  }
+  return undefined;
+}
+
+function writeCache(events: NostrEvent[]): void {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ events, savedAt: Date.now() }));
+  } catch {
+    // Storage full or blocked: the next visit just loads from the relays
+  }
+}
+
 /**
  * Fetch all curated notes once, sorted by order. Search and tag filtering
  * happen in the browser, so typing never triggers a relay query.
+ * The last full result is kept in localStorage and shown straight away on
+ * the next visit while the relays are asked again in the background.
  */
 export function useStructuredNotes() {
   const { nostr } = useNostr();
+  const queryClient = useQueryClient();
 
   // Fixed relays so curated notes are consistent regardless of login. Each is
   // queried on its own; the shared connections come from the pool.
   const relays = useMemo(() => CURATED_RELAYS.map((url) => nostr.relay(url)), [nostr]);
 
+  const [cached] = useState(readCache);
+
   return useQuery({
-    queryKey: ['nostr', 'notes', APP_AUTHOR_PUBKEY],
+    queryKey: NOTES_KEY,
     queryFn: async ({ signal }) => {
       const events = await fetchAllNotes(
         relays,
         AbortSignal.any([signal, AbortSignal.timeout(60000)]),
+        // Show notes as each page arrives. Not on a refresh of a full list,
+        // which would briefly shrink to whatever the first relay sent.
+        (partial) => {
+          const current = queryClient.getQueryData<StructuredNote[]>(NOTES_KEY);
+          if (!current || partial.length > current.length) {
+            queryClient.setQueryData(NOTES_KEY, partial.map(parseNote).sort(byOrder));
+          }
+        },
       );
+      writeCache(events);
       return events.map(parseNote).sort(byOrder);
     },
+    initialData: cached && (() => cached.events.map(parseNote).sort(byOrder)),
+    initialDataUpdatedAt: cached?.savedAt,
     staleTime: 10 * 60 * 1000,
   });
 }
