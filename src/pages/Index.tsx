@@ -223,9 +223,9 @@ const Index = () => {
               </div>
             )}
 
-            {/* Notes list */}
+            {/* Notes list, centred on the page */}
             {hasSearched && !isLoading && filteredNotes.length > 0 && (
-              <div className="max-w-none">
+              <div className="mx-auto w-fit max-w-full">
                 {filteredNotes.map((note) => (
                   <NoteCard key={note.id} note={note} />
                 ))}
