@@ -233,7 +233,9 @@ interface CreateNoteParams {
 
 /** Create or update a structured text note */
 export function usePublishNote() {
-  const { mutateAsync: publishEvent } = useNostrPublish();
+  // Publish to the relays the app reads from, not the author's own relay
+  // list, or a note can land somewhere the app never looks
+  const { mutateAsync: publishEvent } = useNostrPublish({ relays: CURATED_RELAYS });
   const queryClient = useQueryClient();
 
   return useMutation({
