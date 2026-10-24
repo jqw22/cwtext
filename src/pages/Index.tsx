@@ -3,12 +3,13 @@ import { useSearchParams } from 'react-router-dom';
 import { useSeoMeta } from '@unhead/react';
 import { LoginArea } from '@/components/auth/LoginArea';
 import { NoteForm } from '@/components/notes/NoteForm';
+import { NoteImport } from '@/components/notes/NoteImport';
 import { NoteCard } from '@/components/notes/NoteCard';
 import { SearchFilters } from '@/components/notes/SearchFilters';
 import { ExportODTButton } from '@/components/notes/ExportODTButton';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, PenLine, Search } from 'lucide-react';
+import { Plus, PenLine, Search, Upload } from 'lucide-react';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useStructuredNotes, usePublishNote, normalizeTag } from '@/hooks/useStructuredNotes';
 import { useToast } from '@/hooks/useToast';
@@ -18,6 +19,7 @@ const Index = () => {
   const { user } = useCurrentUser();
   const { toast } = useToast();
   const [showCuratedForm, setShowCuratedForm] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   // Search text (?q=) and tags (?tag=, repeatable) live in the URL, so Back
   // from a paragraph returns to the same results and a filtered view can be shared
   const [searchParams, setSearchParams] = useSearchParams();
@@ -158,14 +160,24 @@ const Index = () => {
                 </p>
               )}
               {isAppAuthor && (
-                <Button
-                  onClick={() => setShowCuratedForm(!showCuratedForm)}
-                  variant={showCuratedForm ? 'secondary' : 'default'}
-                  size="sm"
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  {showCuratedForm ? 'Close Form' : 'New Note'}
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => setShowImport(!showImport)}
+                    variant={showImport ? 'secondary' : 'outline'}
+                    size="sm"
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    {showImport ? 'Close Import' : 'Import'}
+                  </Button>
+                  <Button
+                    onClick={() => setShowCuratedForm(!showCuratedForm)}
+                    variant={showCuratedForm ? 'secondary' : 'default'}
+                    size="sm"
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    {showCuratedForm ? 'Close Form' : 'New Note'}
+                  </Button>
+                </div>
               )}
             </div>
 
@@ -179,8 +191,17 @@ const Index = () => {
               />
             )}
 
+            {/* Import many notes from a document */}
+            {showImport && isAppAuthor && (
+              <NoteImport
+                existingNotes={notes ?? []}
+                availableTags={tagCounts}
+                onClose={() => setShowImport(false)}
+              />
+            )}
+
             {/* Welcome state */}
-            {!hasSearched && !showCuratedForm && (
+            {!hasSearched && !showCuratedForm && !showImport && (
               <div className="text-center py-24 border-2 border-dashed rounded-xl">
                 <Search className="h-16 w-16 mx-auto mb-6 text-muted-foreground/20" />
                 <h2 className="text-2xl font-semibold mb-3">Find a passage</h2>
