@@ -71,27 +71,6 @@ export async function saveDbNote(client: SupabaseClient, note: NoteInput): Promi
   return data as NoteRow;
 }
 
-/** Rows per insert when copying many notes */
-const BATCH_SIZE = 100;
-
-/**
- * Add the notes whose slug isn't in the database yet, leaving the ones that
- * are untouched. Returns how many were added.
- */
-export async function addMissingDbNotes(client: SupabaseClient, notes: NoteInput[]): Promise<number> {
-  let added = 0;
-  for (let i = 0; i < notes.length; i += BATCH_SIZE) {
-    const { data, error } = await client
-      .from('notes')
-      .upsert(notes.slice(i, i + BATCH_SIZE), { onConflict: 'slug', ignoreDuplicates: true })
-      .select('slug');
-
-    if (error) throw error;
-    added += data.length;
-  }
-  return added;
-}
-
 /** How many notes the database holds */
 export async function countDbNotes(client: SupabaseClient, signal: AbortSignal): Promise<number> {
   const { count, error } = await client

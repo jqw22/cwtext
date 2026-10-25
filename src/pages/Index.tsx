@@ -9,13 +9,12 @@ import { SearchFilters } from '@/components/notes/SearchFilters';
 import { ExportODTButton } from '@/components/notes/ExportODTButton';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { DatabaseBackup, Loader2, Plus, PenLine, Search, Upload } from 'lucide-react';
+import { Plus, PenLine, Search, Upload } from 'lucide-react';
 import { useCurator } from '@/hooks/useCurator';
 import {
   useStructuredNotes,
   useSaveNote,
   useDbNoteCount,
-  useCopyNotesFromNostr,
   normalizeTag,
 } from '@/hooks/useStructuredNotes';
 import { useToast } from '@/hooks/useToast';
@@ -56,23 +55,9 @@ const Index = () => {
 
   const { mutateAsync: saveNote, isPending: isSaving } = useSaveNote();
 
-  // Until the database holds the notes, the site still reads Nostr, and saving
-  // one note would replace the whole list with it, so copy them across first
+  // Editing needs the database itself; while only the backup can be read, it waits
   const { data: dbCount } = useDbNoteCount(isCurator);
   const canEdit = isCurator && !!dbCount;
-  const { mutateAsync: copyFromNostr, isPending: isCopying } = useCopyNotesFromNostr();
-
-  const handleCopy = useCallback(async () => {
-    try {
-      const { found, added } = await copyFromNostr();
-      toast({
-        title: 'Notes copied',
-        description: `${found} note${found !== 1 ? 's' : ''} found on Nostr, ${added} new to the database.`,
-      });
-    } catch (err) {
-      toast({ title: 'Copy failed', description: err instanceof Error ? err.message : 'An error occurred.', variant: 'destructive' });
-    }
-  }, [copyFromNostr, toast]);
 
   useSeoMeta({
     title: 'Selected Texts of C.G. Jung',
@@ -187,18 +172,6 @@ const Index = () => {
                       {dbCount} in database
                     </span>
                   )}
-                  <Button
-                    onClick={handleCopy}
-                    variant="outline"
-                    size="sm"
-                    disabled={isCopying}
-                    title="Add any notes on Nostr that the database doesn't have yet"
-                  >
-                    {isCopying
-                      ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      : <DatabaseBackup className="mr-2 h-4 w-4" />}
-                    Copy from Nostr
-                  </Button>
                   <Button
                     disabled={!canEdit}
                     onClick={() => setShowImport(!showImport)}
