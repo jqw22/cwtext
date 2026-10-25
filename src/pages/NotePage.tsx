@@ -1,69 +1,25 @@
 import { useState } from 'react';
-import { nip19 } from 'nostr-tools';
-import { useParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import { useSeoMeta } from '@unhead/react';
 import { useStructuredNote, useSaveNote, useDbNoteCount } from '@/hooks/useStructuredNotes';
 import { useCurator } from '@/hooks/useCurator';
-import { useAuthor } from '@/hooks/useAuthor';
 import { useToast } from '@/hooks/useToast';
 import { NoteForm } from '@/components/notes/NoteForm';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Link, useLocation } from 'react-router-dom';
-import { ArrowLeft, Clock, User, Pencil } from 'lucide-react';
-import { APP_AUTHOR_PUBKEY } from '@/lib/appAuthor';
-import NotFound from './NotFound';
+import { ArrowLeft, Clock, Pencil } from 'lucide-react';
 
-export function NIP19Page() {
-  const { nip19: identifier } = useParams<{ nip19: string }>();
-
-  if (!identifier) {
-    return <NotFound />;
-  }
-
-  let decoded;
-  try {
-    decoded = nip19.decode(identifier);
-  } catch {
-    return <NotFound />;
-  }
-
-  const { type } = decoded;
-
-  // Structured Note (kind 30023 NIP-23) - render full note view
-  if (type === 'naddr' && decoded.data.kind === 30023) {
-    return <StructuredNoteView id={decoded.data.identifier} />;
-  }
-
-  // Regular nevent
-  if (type === 'nevent') {
-    return <div>Event placeholder</div>;
-  }
-
-  switch (type) {
-    case 'npub':
-    case 'nprofile':
-      return <div>Profile placeholder</div>;
-    case 'note':
-      return <div>Note placeholder</div>;
-    case 'naddr':
-      return <div>Addressable event placeholder</div>;
-    default:
-      return <NotFound />;
-  }
-}
-
-/** Full view for a structured text note (kind 30023 NIP-23) with edit support */
-function StructuredNoteView({ id }: { id: string }) {
+/** One paragraph, with editing for the curator */
+export function NotePage() {
+  const { slug: id = '' } = useParams<{ slug: string }>();
   const { data: note, isLoading, error } = useStructuredNote(id);
-  const author = useAuthor(APP_AUTHOR_PUBKEY);
   const { isCurator } = useCurator();
   const { mutateAsync: saveNote, isPending: isSaving } = useSaveNote();
   const { toast } = useToast();
   const [editing, setEditing] = useState(false);
 
-  // Editing waits until the notes have been copied into the database (see Index)
+  // Editing needs the database itself (see Index)
   const { data: dbCount } = useDbNoteCount(isCurator);
   const isOwner = isCurator && !!dbCount;
 
@@ -121,12 +77,10 @@ function StructuredNoteView({ id }: { id: string }) {
     );
   }
 
-  const formattedDate = new Date(note.createdAt * 1000).toLocaleDateString(
+  const formattedDate = new Date((note.publishedAt ?? note.createdAt) * 1000).toLocaleDateString(
     undefined,
     { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' },
   );
-
-  const authorName = author.data?.metadata?.name ?? 'Anonymous';
 
   // Editing mode — show the form
   if (editing) {
@@ -183,11 +137,6 @@ function StructuredNoteView({ id }: { id: string }) {
         </h1>
 
         <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mb-6">
-          <div className="flex items-center gap-1.5">
-            <User className="h-3.5 w-3.5" />
-            <span>{authorName}</span>
-          </div>
-          <span className="text-muted-foreground/40">·</span>
           <div className="flex items-center gap-1.5">
             <Clock className="h-3.5 w-3.5" />
             <time>{formattedDate}</time>

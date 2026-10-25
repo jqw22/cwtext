@@ -5,16 +5,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createHead, UnheadProvider } from '@unhead/react/client';
 import { InferSeoMetaPlugin } from 'unhead/plugins';
 import { Suspense } from 'react';
-import NostrProvider from '@/components/NostrProvider';
-import { NostrSync } from '@/components/NostrSync';
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { NostrLoginProvider } from '@nostrify/react/login';
-import { LegacyKeyNotice } from '@/components/auth/LegacyKeyNotice';
-import { ExtensionAccountSync } from '@/components/auth/ExtensionAccountSync';
 import { AppProvider } from '@/components/AppProvider';
 import { AppConfig } from '@/contexts/AppContext';
-import { APP_RELAYS } from '@/lib/appRelays';
 import AppRouter from './AppRouter';
 
 const head = createHead({
@@ -35,16 +29,6 @@ const queryClient = new QueryClient({
 
 const defaultConfig: AppConfig = {
   theme: "light",
-  relayMetadata: APP_RELAYS,
-  blossomServerMetadata: {
-    servers: [
-      'https://blossom.ditto.pub/',
-      'https://blossom.dreamith.to/',
-      'https://blossom.primal.net/',
-    ],
-    updatedAt: 0,
-  },
-  useAppBlossomServers: true,
 };
 
 export function App() {
@@ -52,19 +36,12 @@ export function App() {
     <UnheadProvider head={head}>
       <AppProvider storageKey="nostr:app-config" defaultConfig={defaultConfig}>
         <QueryClientProvider client={queryClient}>
-          <NostrLoginProvider storageKey='nostr:login'>
-            <NostrProvider>
-              <NostrSync />
-              <LegacyKeyNotice />
-              <ExtensionAccountSync />
-              <TooltipProvider>
-                <Toaster />
-                <Suspense>
-                  <AppRouter />
-                </Suspense>
-              </TooltipProvider>
-            </NostrProvider>
-          </NostrLoginProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Suspense>
+              <AppRouter />
+            </Suspense>
+          </TooltipProvider>
         </QueryClientProvider>
       </AppProvider>
     </UnheadProvider>
