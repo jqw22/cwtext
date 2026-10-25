@@ -1,0 +1,48 @@
+name: Back up notes
+
+# Every night, save the database's notes to public/notes.json and redeploy if
+# they changed. Querying the database also keeps a free Supabase project from
+# pausing for inactivity.
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: "backup-notes"
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Export notes
+        run: node scripts/backup-notes.mjs
+
+      - name: Commit and redeploy if changed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git diff --quiet -- public/notes.json; then
+            echo "No changes"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/notes.json
+          git commit -m "Back up notes"
+          git push
+          # Pushes made with the workflow token don't start other workflows, so ask for the deploy
+          gh workflow run deploy.yml --ref main
