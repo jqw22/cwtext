@@ -6,33 +6,33 @@ import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Upload } from 'lucide-react';
 import { useToast } from '@/hooks/useToast';
-import { usePublishNote, normalizeTag, type StructuredNote } from '@/hooks/useStructuredNotes';
+import { useSaveNote, normalizeTag, type StructuredNote } from '@/hooks/useStructuredNotes';
 import { parseNotesFile, noteContent, type ParsedDocument } from '@/lib/parseNotesDocument';
 
 interface NoteImportProps {
-  /** Notes already published, so ones with the same para. and text are skipped */
+  /** Notes already saved, so ones with the same para. and text are skipped */
   existingNotes: StructuredNote[];
   /** Existing texts from all notes, with counts — shown as suggestions */
   availableTags?: Map<string, number>;
   onClose: () => void;
 }
 
-/** Publish many notes at once from a Word or plain-text document */
+/** Save many notes at once from a Word or plain-text document */
 export function NoteImport({ existingNotes, availableTags, onClose }: NoteImportProps) {
   const { toast } = useToast();
-  const { mutateAsync: publishNote } = usePublishNote();
+  const { mutateAsync: saveNote } = useSaveNote();
   const [fileName, setFileName] = useState('');
   const [parsed, setParsed] = useState<ParsedDocument>();
   const [text, setText] = useState('');
   const [includeFootnotes, setIncludeFootnotes] = useState(true);
   const [publishing, setPublishing] = useState(false);
   const [done, setDone] = useState(0);
-  // Paras published in this session, before the note list has caught up
+  // Paras saved in this session, before the note list has caught up
   const [published, setPublished] = useState<Set<string>>(new Set());
 
   const tag = normalizeTag(text);
 
-  // Paras already published under this text
+  // Paras already saved under this text
   const existingTitles = useMemo(() => {
     const titles = new Set<string>();
     for (const note of existingNotes) {
@@ -74,7 +74,7 @@ export function NoteImport({ existingNotes, availableTags, onClose }: NoteImport
     try {
       // One at a time, so a failure stops the run and the rest can be retried
       for (const note of toPublish) {
-        await publishNote({
+        await saveNote({
           title: note.title,
           content: noteContent(note, includeFootnotes),
           tags: [tag],
@@ -84,11 +84,11 @@ export function NoteImport({ existingNotes, availableTags, onClose }: NoteImport
         setDone(count);
         setPublished((prev) => new Set(prev).add(`${tag}\n${note.title}`));
       }
-      toast({ title: 'Notes published!', description: `${count} note${count !== 1 ? 's' : ''} published under "${tag}".` });
+      toast({ title: 'Notes saved', description: `${count} note${count !== 1 ? 's' : ''} saved under "${tag}".` });
     } catch (err) {
       toast({
         title: `Stopped after ${count} note${count !== 1 ? 's' : ''}`,
-        description: `${err instanceof Error ? err.message : 'An error occurred.'} Press Publish again to carry on.`,
+        description: `${err instanceof Error ? err.message : 'An error occurred.'} Press Save again to carry on.`,
         variant: 'destructive',
       });
     } finally {
@@ -159,7 +159,7 @@ export function NoteImport({ existingNotes, availableTags, onClose }: NoteImport
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">
               {notes.length} note{notes.length !== 1 ? 's' : ''} found
-              {notes.length !== toPublish.length && `, ${notes.length - toPublish.length} already published under this text and will be skipped`}
+              {notes.length !== toPublish.length && `, ${notes.length - toPublish.length} already saved under this text and will be skipped`}
               {parsed && parsed.skipped.length > 0 && `. ${parsed.skipped.length} line${parsed.skipped.length !== 1 ? 's' : ''} before the first para. number left out`}
               .
             </p>
@@ -191,8 +191,8 @@ export function NoteImport({ existingNotes, availableTags, onClose }: NoteImport
           <Button onClick={handlePublish} disabled={publishing || toPublish.length === 0}>
             {publishing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {publishing
-              ? `Publishing ${done + 1} of ${toPublish.length}…`
-              : `Publish ${toPublish.length} note${toPublish.length !== 1 ? 's' : ''}`}
+              ? `Saving ${done + 1} of ${toPublish.length}…`
+              : `Save ${toPublish.length} note${toPublish.length !== 1 ? 's' : ''}`}
           </Button>
         </div>
       </CardContent>

@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { nip19 } from 'nostr-tools';
 import { useParams } from 'react-router-dom';
 import { useSeoMeta } from '@unhead/react';
-import { useStructuredNote, usePublishNote } from '@/hooks/useStructuredNotes';
+import { useStructuredNote, useSaveNote, useDbNoteCount } from '@/hooks/useStructuredNotes';
+import { useCurator } from '@/hooks/useCurator';
 import { useAuthor } from '@/hooks/useAuthor';
-import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useToast } from '@/hooks/useToast';
 import { NoteForm } from '@/components/notes/NoteForm';
 import { Badge } from '@/components/ui/badge';
@@ -58,12 +58,14 @@ export function NIP19Page() {
 function StructuredNoteView({ id }: { id: string }) {
   const { data: note, isLoading, error } = useStructuredNote(id);
   const author = useAuthor(APP_AUTHOR_PUBKEY);
-  const { user } = useCurrentUser();
-  const { mutateAsync: publishNote, isPending: isPublishing } = usePublishNote();
+  const { isCurator } = useCurator();
+  const { mutateAsync: saveNote, isPending: isSaving } = useSaveNote();
   const { toast } = useToast();
   const [editing, setEditing] = useState(false);
 
-  const isOwner = user?.pubkey === APP_AUTHOR_PUBKEY;
+  // Editing waits until the notes have been copied into the database (see Index)
+  const { data: dbCount } = useDbNoteCount(isCurator);
+  const isOwner = isCurator && !!dbCount;
 
   // Back returns to the search results the note was opened from
   const location = useLocation();
@@ -77,9 +79,9 @@ function StructuredNoteView({ id }: { id: string }) {
   const handleEdit = async (data: { title: string; content: string; tags: string[]; order?: string }) => {
     if (!note) return;
     try {
-      await publishNote({ ...data, dtag: note.id });
+      await saveNote({ ...data, dtag: note.id });
       setEditing(false);
-      toast({ title: 'Note updated', description: 'Texts and content saved to Nostr.' });
+      toast({ title: 'Note updated', description: 'Texts and content saved.' });
     } catch (err) {
       toast({
         title: 'Update failed',
@@ -148,7 +150,7 @@ function StructuredNoteView({ id }: { id: string }) {
             initialOrder={note.order !== Infinity ? String(note.order) : ''}
             onSubmit={handleEdit}
             onCancel={() => setEditing(false)}
-            isSubmitting={isPublishing}
+            isSubmitting={isSaving}
           />
         </div>
       </div>

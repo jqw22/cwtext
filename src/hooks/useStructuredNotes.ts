@@ -2,11 +2,18 @@ import type { NostrEvent, NostrFilter } from '@nostrify/nostrify';
 import { useNostr } from '@nostrify/react';
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNostrPublish } from './useNostrPublish';
 import { APP_AUTHOR_PUBKEY } from '@/lib/appAuthor';
 import { APP_RELAYS } from '@/lib/appRelays';
 import { supabase } from '@/lib/supabase';
-import { fetchDbNote, fetchDbNotes, type NoteRow } from '@/lib/dbNotes';
+import {
+  addMissingDbNotes,
+  countDbNotes,
+  fetchDbNote,
+  fetchDbNotes,
+  saveDbNote,
+  type NoteInput,
+  type NoteRow,
+} from '@/lib/dbNotes';
 
 const NOTE_KIND = 30023;
 
@@ -44,7 +51,7 @@ export function normalizeTag(tag: string): string {
 }
 
 /** Parse a NostrEvent into a StructuredNote */
-function parseNote(event: NostrEvent): StructuredNote {
+export function parseNote(event: NostrEvent): StructuredNote {
   const getTag = (name: string): string | undefined =>
     event.tags.find(([n]) => n === name)?.[1];
 
@@ -79,6 +86,18 @@ export function rowToNote(row: NoteRow): StructuredNote {
     pubkey: APP_AUTHOR_PUBKEY,
     createdAt: Math.floor(Date.parse(row.updated_at) / 1000),
     order: Number.isFinite(order) ? order : Infinity,
+  };
+}
+
+/** The database row for a note, e.g. one loaded from Nostr */
+export function noteToRow(note: StructuredNote): NoteInput {
+  return {
+    slug: note.id,
+    para: note.title,
+    sort_order: Number.isFinite(note.order) ? note.order : null,
+    body: note.content,
+    tags: note.tags,
+    published_at: new Date((note.publishedAt ?? note.createdAt) * 1000).toISOString(),
   };
 }
 
@@ -330,63 +349,75 @@ export function useStructuredNote(id: string) {
   });
 }
 
-interface CreateNoteParams {
+interface SaveNoteParams {
   title: string;
   content: string;
   tags?: string[];
   /** Numeric order for sequencing (to 1dp) */
   order?: string;
-  /** Optional d-tag for editing an existing note */
+  /** Slug of an existing note to replace */
   dtag?: string;
 }
 
-/** Create or update a structured text note */
-export function usePublishNote() {
-  // Publish to the relays the app reads from, not the author's own relay
-  // list, or a note can land somewhere the app never looks
-  const { mutateAsync: publishEvent } = useNostrPublish({ relays: CURATED_RELAYS });
+/** Refresh everything that shows notes after the database changes */
+function invalidateNotes(queryClient: ReturnType<typeof useQueryClient>) {
+  queryClient.invalidateQueries({ queryKey: ['nostr', 'notes'] });
+  queryClient.invalidateQueries({ queryKey: ['nostr', 'note'] });
+  queryClient.invalidateQueries({ queryKey: DB_COUNT_KEY });
+}
+
+/** Create or update a note in the database. Only works for a signed-in curator. */
+export function useSaveNote() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (params: CreateNoteParams) => {
+    mutationFn: async (params: SaveNoteParams) => {
+      if (!supabase) throw new Error('No note database is configured');
       const { title, content, tags = [], order, dtag } = params;
-      const noteTags: string[][] = [];
 
-      // d-tag (unique identifier)
-      noteTags.push(['d', dtag ?? crypto.randomUUID()]);
-
-      // Para. label
-      noteTags.push(['title', title]);
-
-      // Category tags
-      for (const tag of tags) {
-        if (tag.trim()) {
-          noteTags.push(['t', normalizeTag(tag)]);
-        }
-      }
-
-      // Order for sequencing (optional)
-      if (order) {
-        noteTags.push(['order', order]);
-      }
-
-      // Published at
-      noteTags.push(['published_at', String(Math.floor(Date.now() / 1000))]);
-
-      // NIP-31 alt tag
-      noteTags.push(['alt', 'Long-form Content']);
-
-      const event = await publishEvent({
-        kind: NOTE_KIND,
-        content,
-        tags: noteTags,
+      const row = await saveDbNote(supabase, {
+        slug: dtag ?? crypto.randomUUID(),
+        para: title,
+        sort_order: order ? Number(order) : null,
+        body: content,
+        tags: [...new Set(tags.map(normalizeTag).filter(Boolean))],
+        // An edit keeps the note's original date
+        ...(dtag ? {} : { published_at: new Date().toISOString() }),
       });
 
-      return parseNote(event);
+      return rowToNote(row);
     },
-    onSuccess: (note) => {
-      queryClient.invalidateQueries({ queryKey: ['nostr', 'notes'] });
-      queryClient.invalidateQueries({ queryKey: ['nostr', 'note', APP_AUTHOR_PUBKEY, note.id] });
+    onSuccess: () => invalidateNotes(queryClient),
+  });
+}
+
+const DB_COUNT_KEY = ['db', 'count'];
+
+/** How many notes the database holds, for the curator's tools */
+export function useDbNoteCount(enabled: boolean) {
+  return useQuery({
+    queryKey: DB_COUNT_KEY,
+    queryFn: ({ signal }) => countDbNotes(supabase!, signal),
+    enabled: enabled && !!supabase,
+  });
+}
+
+/**
+ * Copy every curated note on the relays into the database, skipping any the
+ * database already has so edits made there are kept.
+ */
+export function useCopyNotesFromNostr() {
+  const { nostr } = useNostr();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      if (!supabase) throw new Error('No note database is configured');
+      const relays = CURATED_RELAYS.map((url) => nostr.relay(url));
+      const events = await fetchAllNotes(relays, AbortSignal.timeout(60000));
+      const added = await addMissingDbNotes(supabase, events.map(parseNote).map(noteToRow));
+      return { found: events.length, added };
     },
+    onSuccess: () => invalidateNotes(queryClient),
   });
 }

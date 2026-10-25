@@ -14,7 +14,7 @@ interface SearchFiltersProps {
   onAddTag: (tag: string) => void;
   /** Clear the search text and every selected tag at once */
   onClearAll: () => void;
-  /** Notes (and so tags) are still loading from the relays */
+  /** Notes (and so tags) are still loading */
   isLoading?: boolean;
   /** Loading failed; offer a retry */
   onRetry?: () => void;
@@ -58,7 +58,7 @@ export function SearchFilters({
           {isLoading ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
-              Loading texts from the relays…
+              Loading texts…
             </>
           ) : (
             <>
