@@ -15,7 +15,7 @@ describe('NoteImport', () => {
     await screen.findByText('Import Notes');
     fireEvent.change(document.querySelector('input[type="file"]')!, { target: { files: [file] } });
 
-    await waitFor(() => expect(screen.getByText('Publish 2 notes')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Save 2 notes')).toBeInTheDocument());
     expect(screen.getByText(/First paragraph\.\s+\(1\) A footnote\./)).toBeInTheDocument();
   });
 });

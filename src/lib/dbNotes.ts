@@ -53,3 +53,52 @@ export async function fetchDbNote(
   if (error) throw error;
   return data as NoteRow | null;
 }
+
+/** The fields written when saving a note; the database fills in the rest */
+export type NoteInput = Pick<NoteRow, 'slug' | 'para' | 'sort_order' | 'body' | 'tags'> & {
+  published_at?: string | null;
+};
+
+/** Add a note, or replace the one with the same slug */
+export async function saveDbNote(client: SupabaseClient, note: NoteInput): Promise<NoteRow> {
+  const { data, error } = await client
+    .from('notes')
+    .upsert(note, { onConflict: 'slug' })
+    .select(COLUMNS)
+    .single();
+
+  if (error) throw error;
+  return data as NoteRow;
+}
+
+/** Rows per insert when copying many notes */
+const BATCH_SIZE = 100;
+
+/**
+ * Add the notes whose slug isn't in the database yet, leaving the ones that
+ * are untouched. Returns how many were added.
+ */
+export async function addMissingDbNotes(client: SupabaseClient, notes: NoteInput[]): Promise<number> {
+  let added = 0;
+  for (let i = 0; i < notes.length; i += BATCH_SIZE) {
+    const { data, error } = await client
+      .from('notes')
+      .upsert(notes.slice(i, i + BATCH_SIZE), { onConflict: 'slug', ignoreDuplicates: true })
+      .select('slug');
+
+    if (error) throw error;
+    added += data.length;
+  }
+  return added;
+}
+
+/** How many notes the database holds */
+export async function countDbNotes(client: SupabaseClient, signal: AbortSignal): Promise<number> {
+  const { count, error } = await client
+    .from('notes')
+    .select('id', { count: 'exact', head: true })
+    .abortSignal(signal);
+
+  if (error) throw error;
+  return count ?? 0;
+}

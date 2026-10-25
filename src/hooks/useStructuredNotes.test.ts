@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { NostrEvent, NostrFilter } from '@nostrify/nostrify';
-import { fetchAllNotes, normalizeTag, rowToNote } from './useStructuredNotes';
+import { fetchAllNotes, normalizeTag, noteToRow, parseNote, rowToNote } from './useStructuredNotes';
 import { APP_AUTHOR_PUBKEY } from '@/lib/appAuthor';
 
 function note(i: number, createdAt: number, d = `d${i}`): NostrEvent {
@@ -122,5 +122,29 @@ describe('rowToNote', () => {
 
   it('sorts notes without an order last', () => {
     expect(rowToNote({ ...row, sort_order: null }).order).toBe(Infinity);
+  });
+});
+
+describe('noteToRow', () => {
+  it('keeps every field of a Nostr note', () => {
+    const event = {
+      ...note(1, 1790899200, 'slug-1'),
+      content: 'Body',
+      tags: [['d', 'slug-1'], ['title', '307'], ['order', '307.0'], ['t', 'Kore'], ['published_at', '1790812800']],
+    };
+    expect(noteToRow(parseNote(event))).toEqual({
+      slug: 'slug-1',
+      para: '307',
+      sort_order: 307,
+      body: 'Body',
+      tags: ['kore'],
+      published_at: '2026-10-01T00:00:00.000Z',
+    });
+  });
+
+  it('leaves out a missing order and falls back to created_at', () => {
+    const row = noteToRow(parseNote(note(2, 1790899200)));
+    expect(row.sort_order).toBeNull();
+    expect(row.published_at).toBe('2026-10-02T00:00:00.000Z');
   });
 });

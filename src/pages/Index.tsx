@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useSeoMeta } from '@unhead/react';
-import { LoginArea } from '@/components/auth/LoginArea';
+import { CuratorLogin } from '@/components/auth/CuratorLogin';
 import { NoteForm } from '@/components/notes/NoteForm';
 import { NoteImport } from '@/components/notes/NoteImport';
 import { NoteCard } from '@/components/notes/NoteCard';
@@ -9,14 +9,19 @@ import { SearchFilters } from '@/components/notes/SearchFilters';
 import { ExportODTButton } from '@/components/notes/ExportODTButton';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, PenLine, Search, Upload } from 'lucide-react';
-import { useCurrentUser } from '@/hooks/useCurrentUser';
-import { useStructuredNotes, usePublishNote, normalizeTag } from '@/hooks/useStructuredNotes';
+import { DatabaseBackup, Loader2, Plus, PenLine, Search, Upload } from 'lucide-react';
+import { useCurator } from '@/hooks/useCurator';
+import {
+  useStructuredNotes,
+  useSaveNote,
+  useDbNoteCount,
+  useCopyNotesFromNostr,
+  normalizeTag,
+} from '@/hooks/useStructuredNotes';
 import { useToast } from '@/hooks/useToast';
-import { APP_AUTHOR_PUBKEY } from '@/lib/appAuthor';
 
 const Index = () => {
-  const { user } = useCurrentUser();
+  const { isCurator } = useCurator();
   const { toast } = useToast();
   const [showCuratedForm, setShowCuratedForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -45,12 +50,29 @@ const Index = () => {
   }, [setSearchParams]);
 
   const hasSearched = search.trim().length > 0 || selectedTags.length > 0;
-  const isAppAuthor = user?.pubkey === APP_AUTHOR_PUBKEY;
 
   // All curated notes load once; search and tags filter them in the browser
   const { data: notes, isLoading, error, refetch } = useStructuredNotes();
 
-  const { mutateAsync: publishNote, isPending: isPublishing } = usePublishNote();
+  const { mutateAsync: saveNote, isPending: isSaving } = useSaveNote();
+
+  // Until the database holds the notes, the site still reads Nostr, and saving
+  // one note would replace the whole list with it, so copy them across first
+  const { data: dbCount } = useDbNoteCount(isCurator);
+  const canEdit = isCurator && !!dbCount;
+  const { mutateAsync: copyFromNostr, isPending: isCopying } = useCopyNotesFromNostr();
+
+  const handleCopy = useCallback(async () => {
+    try {
+      const { found, added } = await copyFromNostr();
+      toast({
+        title: 'Notes copied',
+        description: `${found} note${found !== 1 ? 's' : ''} found on Nostr, ${added} new to the database.`,
+      });
+    } catch (err) {
+      toast({ title: 'Copy failed', description: err instanceof Error ? err.message : 'An error occurred.', variant: 'destructive' });
+    }
+  }, [copyFromNostr, toast]);
 
   useSeoMeta({
     title: 'Selected Texts of C.G. Jung',
@@ -103,16 +125,15 @@ const Index = () => {
 
   const handleCreateNote = useCallback(
     async (data: { title: string; content: string; tags: string[]; order?: string }) => {
-      if (!user) return;
       try {
-        await publishNote(data);
+        await saveNote(data);
         setShowCuratedForm(false);
-        toast({ title: 'Note published!', description: `"${data.title}" has been published to Nostr.` });
+        toast({ title: 'Note saved', description: `"${data.title}" has been added.` });
       } catch (err) {
-        toast({ title: 'Failed to publish', description: err instanceof Error ? err.message : 'An error occurred.', variant: 'destructive' });
+        toast({ title: 'Failed to save', description: err instanceof Error ? err.message : 'An error occurred.', variant: 'destructive' });
       }
     },
-    [user, publishNote, toast],
+    [saveNote, toast],
   );
 
   return (
@@ -126,7 +147,7 @@ const Index = () => {
           </div>
           <div className="flex items-center gap-3">
             <ExportODTButton notes={filteredNotes} title="cwtext_export" filterTags={selectedTags} />
-            <LoginArea className="w-auto" />
+            <CuratorLogin />
           </div>
         </div>
       </header>
@@ -159,9 +180,27 @@ const Index = () => {
                   Use the search bar above or click a text to find passages
                 </p>
               )}
-              {isAppAuthor && (
-                <div className="flex gap-2">
+              {isCurator && (
+                <div className="flex items-center gap-2">
+                  {dbCount !== undefined && (
+                    <span className="text-xs text-muted-foreground">
+                      {dbCount} in database
+                    </span>
+                  )}
                   <Button
+                    onClick={handleCopy}
+                    variant="outline"
+                    size="sm"
+                    disabled={isCopying}
+                    title="Add any notes on Nostr that the database doesn't have yet"
+                  >
+                    {isCopying
+                      ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      : <DatabaseBackup className="mr-2 h-4 w-4" />}
+                    Copy from Nostr
+                  </Button>
+                  <Button
+                    disabled={!canEdit}
                     onClick={() => setShowImport(!showImport)}
                     variant={showImport ? 'secondary' : 'outline'}
                     size="sm"
@@ -170,6 +209,7 @@ const Index = () => {
                     {showImport ? 'Close Import' : 'Import'}
                   </Button>
                   <Button
+                    disabled={!canEdit}
                     onClick={() => setShowCuratedForm(!showCuratedForm)}
                     variant={showCuratedForm ? 'secondary' : 'default'}
                     size="sm"
@@ -182,17 +222,17 @@ const Index = () => {
             </div>
 
             {/* Curated note form */}
-            {showCuratedForm && isAppAuthor && (
+            {showCuratedForm && canEdit && (
               <NoteForm
                 onSubmit={handleCreateNote}
                 onCancel={() => setShowCuratedForm(false)}
-                isSubmitting={isPublishing}
+                isSubmitting={isSaving}
                 availableTags={tagCounts}
               />
             )}
 
             {/* Import many notes from a document */}
-            {showImport && isAppAuthor && (
+            {showImport && canEdit && (
               <NoteImport
                 existingNotes={notes ?? []}
                 availableTags={tagCounts}
@@ -229,7 +269,7 @@ const Index = () => {
             {hasSearched && error && (
               <div className="text-center py-12">
                 <p className="text-destructive text-lg font-medium mb-2">Failed to load notes</p>
-                <p className="text-muted-foreground text-sm">Check your relay connections and try again.</p>
+                <p className="text-muted-foreground text-sm">Check your connection and try again.</p>
               </div>
             )}
 
@@ -253,11 +293,6 @@ const Index = () => {
               </div>
             )}
 
-            {hasSearched && !isLoading && !error && filteredNotes.length > 0 && (
-              <p className="text-center text-xs text-muted-foreground pb-8">
-                Powered by Nostr
-              </p>
-            )}
         </div>
       </main>
     </div>
