@@ -117,6 +117,22 @@ async function fetchNotesFromDb(signal: AbortSignal): Promise<StructuredNote[] |
   }
 }
 
+/**
+ * The nightly copy of the database that ships with the site, or undefined if
+ * it can't be loaded or is empty (before the first backup has run).
+ */
+async function fetchNotesFromBackup(signal: AbortSignal): Promise<StructuredNote[] | undefined> {
+  try {
+    const res = await fetch(`${import.meta.env.BASE_URL}notes.json`, { signal });
+    if (!res.ok) return undefined;
+    const rows: NoteRow[] = await res.json();
+    return Array.isArray(rows) && rows.length > 0 ? rows.map(rowToNote) : undefined;
+  } catch (error) {
+    if (signal.aborted) throw error;
+    return undefined;
+  }
+}
+
 /** Events requested per page. Relays may cap responses lower than this. */
 const PAGE_SIZE = 500;
 
@@ -258,7 +274,8 @@ function writeCache(notes: StructuredNote[]): void {
 
 /**
  * Fetch all curated notes once, sorted by order: from the database when one
- * is configured and holds notes, otherwise from the Nostr relays. Search and
+ * is configured and holds notes, then the nightly backup that ships with the
+ * site, and only then the Nostr relays. Search and
  * tag filtering happen in the browser, so typing never triggers a query.
  * The last full result is kept in localStorage and shown straight away on
  * the next visit while the notes are fetched again in the background.
@@ -276,7 +293,8 @@ export function useStructuredNotes() {
   return useQuery({
     queryKey: NOTES_KEY,
     queryFn: async ({ signal }) => {
-      const fromDb = await fetchNotesFromDb(AbortSignal.any([signal, AbortSignal.timeout(15000)]));
+      const fromDb = await fetchNotesFromDb(AbortSignal.any([signal, AbortSignal.timeout(15000)]))
+        ?? await fetchNotesFromBackup(signal);
       if (fromDb) {
         const notes = fromDb.sort(byOrder);
         writeCache(notes);
@@ -305,7 +323,7 @@ export function useStructuredNotes() {
   });
 }
 
-/** Fetch a single note by its slug (the Nostr d tag): from the database first, then the relays */
+/** Fetch a single note by its slug (the Nostr d tag): from the database, then the nightly backup, then the relays */
 export function useStructuredNote(id: string) {
   const { nostr } = useNostr();
   const queryClient = useQueryClient();
@@ -323,6 +341,9 @@ export function useStructuredNote(id: string) {
           console.warn('Note database unavailable, loading from Nostr', error);
         }
       }
+
+      const fromBackup = (await fetchNotesFromBackup(signal))?.find((n) => n.id === id);
+      if (fromBackup) return fromBackup;
 
       const filter: NostrFilter = {
         kinds: [NOTE_KIND],
