@@ -19,7 +19,7 @@ export function useCurator() {
 
   const userId = session?.user.id;
 
-  const { data: isCurator = false } = useQuery({
+  const { data: isCurator = false, error: checkError } = useQuery({
     queryKey: ['curator', userId],
     queryFn: async () => {
       const { data, error } = await supabase!.rpc('is_curator');
@@ -27,10 +27,18 @@ export function useCurator() {
       return data === true;
     },
     enabled: !!supabase && !!userId,
-    staleTime: Infinity,
+    // Checked again when the tab regains focus, so being added to
+    // `curators` takes effect without signing in again
+    staleTime: 30 * 1000,
   });
 
-  return { session, email: session?.user.email, isCurator: !!userId && isCurator };
+  return {
+    session,
+    email: session?.user.email,
+    isCurator: !!userId && isCurator,
+    /** Why the curator check failed, as opposed to the account simply not being a curator */
+    checkError: checkError instanceof Error ? checkError.message : undefined,
+  };
 }
 
 /** Email a one-time sign-in link that returns to the app */

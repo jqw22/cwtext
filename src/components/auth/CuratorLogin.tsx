@@ -22,7 +22,7 @@ import { useToast } from '@/hooks/useToast';
 
 /** Email sign-in for the curator; readers never need it */
 export function CuratorLogin() {
-  const { email, isCurator } = useCurator();
+  const { email, isCurator, checkError } = useCurator();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [address, setAddress] = useState('');
@@ -39,7 +39,11 @@ export function CuratorLogin() {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuLabel className="font-normal text-muted-foreground">
-            {isCurator ? 'Signed in as curator' : 'This account can’t edit notes'}
+            {isCurator
+              ? 'Signed in as curator'
+              : checkError
+                ? `Couldn’t check editing rights: ${checkError}`
+                : 'This account can’t edit notes'}
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => signOut()}>
