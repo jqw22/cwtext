@@ -5,16 +5,18 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNostrPublish } from './useNostrPublish';
 import { APP_AUTHOR_PUBKEY } from '@/lib/appAuthor';
 import { APP_RELAYS } from '@/lib/appRelays';
+import { supabase } from '@/lib/supabase';
+import { fetchDbNote, fetchDbNotes, type NoteRow } from '@/lib/dbNotes';
 
 const NOTE_KIND = 30023;
 
 /** Consistent relay group for curated notes — unaffected by who logs in */
 const CURATED_RELAYS = APP_RELAYS.relays.map(r => r.url);
 
-/** Data extracted from a kind 30023 (NIP-23) long-form content note */
+/** A curated note, loaded from the database or a kind 30023 (NIP-23) Nostr event */
 export interface StructuredNote {
-  /** The Nostr event */
-  event: NostrEvent;
+  /** The Nostr event, when the note came from a relay */
+  event?: NostrEvent;
   /** Para. label from the `title` tag */
   title: string;
   /** Main text body from `content` */
@@ -62,6 +64,38 @@ function parseNote(event: NostrEvent): StructuredNote {
     createdAt: event.created_at,
     order: getTag('order') ? Number(getTag('order')) : Infinity,
   };
+}
+
+/** Convert a database row to the same shape as a note parsed from Nostr */
+export function rowToNote(row: NoteRow): StructuredNote {
+  const order = row.sort_order === null ? NaN : Number(row.sort_order);
+  return {
+    title: row.para || 'Untitled',
+    content: row.body ?? '',
+    tags: [...new Set((row.tags ?? []).map(normalizeTag).filter(Boolean))],
+    publishedAt: row.published_at ? Math.floor(Date.parse(row.published_at) / 1000) : undefined,
+    id: row.slug,
+    // Database notes are the curator's, so links to them stay valid naddrs
+    pubkey: APP_AUTHOR_PUBKEY,
+    createdAt: Math.floor(Date.parse(row.updated_at) / 1000),
+    order: Number.isFinite(order) ? order : Infinity,
+  };
+}
+
+/**
+ * All notes from the database, or undefined if there is no database, it
+ * can't be reached, or it holds no notes yet; the caller then uses Nostr.
+ */
+async function fetchNotesFromDb(signal: AbortSignal): Promise<StructuredNote[] | undefined> {
+  if (!supabase) return undefined;
+  try {
+    const rows = await fetchDbNotes(supabase, signal);
+    return rows.length > 0 ? rows.map(rowToNote) : undefined;
+  } catch (error) {
+    if (signal.aborted) throw error;
+    console.warn('Note database unavailable, loading from Nostr', error);
+    return undefined;
+  }
 }
 
 /** Events requested per page. Relays may cap responses lower than this. */
@@ -173,31 +207,42 @@ function byOrder(a: StructuredNote, b: StructuredNote): number {
 const NOTES_KEY = ['nostr', 'notes', APP_AUTHOR_PUBKEY];
 
 /** localStorage key for the last full set of curated notes */
-const CACHE_KEY = 'cwtext:notes';
+const CACHE_KEY = 'cwtext:notes:v2';
 
-function readCache(): { events: NostrEvent[]; savedAt: number } | undefined {
+/** Where earlier versions kept raw Nostr events */
+const OLD_CACHE_KEY = 'cwtext:notes';
+
+function readCache(): { notes: StructuredNote[]; savedAt: number } | undefined {
   try {
+    localStorage.removeItem(OLD_CACHE_KEY);
     const cached = JSON.parse(localStorage.getItem(CACHE_KEY) ?? 'null');
-    if (Array.isArray(cached?.events) && typeof cached.savedAt === 'number') return cached;
+    if (Array.isArray(cached?.notes) && typeof cached.savedAt === 'number') {
+      // JSON turns an Infinity order into null
+      const notes = cached.notes.map((n: StructuredNote) => ({ ...n, order: n.order ?? Infinity }));
+      return { notes, savedAt: cached.savedAt };
+    }
   } catch {
-    // Unreadable cache: load from the relays as if there were none
+    // Unreadable cache: load as if there were none
   }
   return undefined;
 }
 
-function writeCache(events: NostrEvent[]): void {
+function writeCache(notes: StructuredNote[]): void {
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ events, savedAt: Date.now() }));
+    // Without the raw events, which roughly double the size
+    const stripped = notes.map(({ event: _event, ...note }) => note);
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ notes: stripped, savedAt: Date.now() }));
   } catch {
-    // Storage full or blocked: the next visit just loads from the relays
+    // Storage full or blocked: the next visit just loads afresh
   }
 }
 
 /**
- * Fetch all curated notes once, sorted by order. Search and tag filtering
- * happen in the browser, so typing never triggers a relay query.
+ * Fetch all curated notes once, sorted by order: from the database when one
+ * is configured and holds notes, otherwise from the Nostr relays. Search and
+ * tag filtering happen in the browser, so typing never triggers a query.
  * The last full result is kept in localStorage and shown straight away on
- * the next visit while the relays are asked again in the background.
+ * the next visit while the notes are fetched again in the background.
  */
 export function useStructuredNotes() {
   const { nostr } = useNostr();
@@ -212,6 +257,13 @@ export function useStructuredNotes() {
   return useQuery({
     queryKey: NOTES_KEY,
     queryFn: async ({ signal }) => {
+      const fromDb = await fetchNotesFromDb(AbortSignal.any([signal, AbortSignal.timeout(15000)]));
+      if (fromDb) {
+        const notes = fromDb.sort(byOrder);
+        writeCache(notes);
+        return notes;
+      }
+
       const events = await fetchAllNotes(
         relays,
         AbortSignal.any([signal, AbortSignal.timeout(60000)]),
@@ -224,16 +276,17 @@ export function useStructuredNotes() {
           }
         },
       );
-      writeCache(events);
-      return events.map(parseNote).sort(byOrder);
+      const notes = events.map(parseNote).sort(byOrder);
+      writeCache(notes);
+      return notes;
     },
-    initialData: cached && (() => cached.events.map(parseNote).sort(byOrder)),
+    initialData: cached?.notes,
     initialDataUpdatedAt: cached?.savedAt,
     staleTime: 10 * 60 * 1000,
   });
 }
 
-/** Fetch a single structured note by its d-tag identifier (always scoped to the app author) */
+/** Fetch a single note by its slug (the Nostr d tag): from the database first, then the relays */
 export function useStructuredNote(id: string) {
   const { nostr } = useNostr();
   const queryClient = useQueryClient();
@@ -242,6 +295,16 @@ export function useStructuredNote(id: string) {
   return useQuery<StructuredNote | null>({
     queryKey: ['nostr', 'note', APP_AUTHOR_PUBKEY, id],
     queryFn: async ({ signal }) => {
+      if (supabase) {
+        try {
+          const row = await fetchDbNote(supabase, id, AbortSignal.any([signal, AbortSignal.timeout(10000)]));
+          if (row) return rowToNote(row);
+        } catch (error) {
+          if (signal.aborted) throw error;
+          console.warn('Note database unavailable, loading from Nostr', error);
+        }
+      }
+
       const filter: NostrFilter = {
         kinds: [NOTE_KIND],
         authors: [APP_AUTHOR_PUBKEY],
