@@ -14,7 +14,11 @@ Curators sign in with an emailed link (the "Sign in" button in the header). To g
 insert into public.curators (user_id) select id from auth.users where email = 'you@example.com';
 ```
 
-Every night the "Back up notes" GitHub Action saves all notes to `public/notes.json` and redeploys if they changed. The site falls back to that file if the database can't be reached. It can also be run by hand from the Actions tab.
+## Works
+
+The Works page (`/works`) lists Jung's essays and books with when each was written and first published, its original title and language, and its volume and paragraph range in the Collected Works. It can be ordered by volume or by date. `supabase/works.sql` sets up the `volumes` and `works` tables, seeded with the 20 volumes and the essays that already have notes. A work is matched to its notes by the text (tag) they carry. Curators add and edit works on that page.
+
+Every night the "Back up notes" GitHub Action saves all notes to `public/notes.json`, and the volumes and works to `public/works.json`, and redeploys if they changed. The site falls back to those files if the database can't be reached. It can also be run by hand from the Actions tab.
 
 Notes were originally published on Nostr. Old `/naddr1…` links redirect to the same note.
 

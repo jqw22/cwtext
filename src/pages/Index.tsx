@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useSeoMeta } from '@unhead/react';
 import { CuratorLogin } from '@/components/auth/CuratorLogin';
 import { NoteForm } from '@/components/notes/NoteForm';
@@ -9,7 +9,7 @@ import { SearchFilters } from '@/components/notes/SearchFilters';
 import { ExportODTButton } from '@/components/notes/ExportODTButton';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, PenLine, Search, Upload } from 'lucide-react';
+import { Plus, PenLine, Search, Upload, BookOpen } from 'lucide-react';
 import { useCurator } from '@/hooks/useCurator';
 import {
   useStructuredNotes,
@@ -18,6 +18,8 @@ import {
   normalizeTag,
 } from '@/hooks/useStructuredNotes';
 import { useToast } from '@/hooks/useToast';
+import { useWorks } from '@/hooks/useWorks';
+import { WorkSummary } from '@/components/works/WorkSummary';
 
 const Index = () => {
   const { isCurator } = useCurator();
@@ -54,6 +56,13 @@ const Index = () => {
   const { data: notes, isLoading, error, refetch } = useStructuredNotes();
 
   const { mutateAsync: saveNote, isPending: isSaving } = useSaveNote();
+
+  // Dates and details of the selected texts, when they have been entered as works
+  const { data: worksData } = useWorks();
+  const selectedWorks = useMemo(
+    () => (worksData?.works ?? []).filter((w) => w.tag && selectedTags.includes(w.tag)),
+    [worksData, selectedTags],
+  );
 
   // Editing needs the database itself; while only the backup can be read, it waits
   const { data: dbCount } = useDbNoteCount(isCurator);
@@ -131,6 +140,9 @@ const Index = () => {
             <h1 className="text-xl font-bold">Selected Texts of C.G. Jung</h1>
           </div>
           <div className="flex items-center gap-3">
+            <Button asChild variant="ghost" size="sm">
+              <Link to="/works" aria-label="Works"><BookOpen className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">Works</span></Link>
+            </Button>
             <ExportODTButton notes={filteredNotes} title="cwtext_export" filterTags={selectedTags} />
             <CuratorLogin />
           </div>
@@ -254,6 +266,13 @@ const Index = () => {
                 <p className="text-muted-foreground max-w-md mx-auto mb-6">
                   Try adjusting your search or filter criteria.
                 </p>
+              </div>
+            )}
+
+            {/* The selected texts' dates and place in the Collected Works */}
+            {selectedWorks.length > 0 && (
+              <div className="mx-auto w-fit max-w-full space-y-1">
+                {selectedWorks.map((work) => <WorkSummary key={work.id} work={work} />)}
               </div>
             )}
 
