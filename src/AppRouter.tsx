@@ -3,6 +3,7 @@ import { ScrollToTop } from "./components/ScrollToTop";
 
 import Index from "./pages/Index";
 import { NotePage } from "./pages/NotePage";
+import { WorksPage } from "./pages/WorksPage";
 import { LegacyNoteRedirect } from "./pages/LegacyNoteRedirect";
 import NotFound from "./pages/NotFound";
 
@@ -16,6 +17,7 @@ export function AppRouter() {
       <Routes>
         <Route path="/" element={<Index />} />
         <Route path="/note/:slug" element={<NotePage />} />
+        <Route path="/works" element={<WorksPage />} />
         {/* Old links by Nostr address (/naddr1…) */}
         <Route path="/:nip19" element={<LegacyNoteRedirect />} />
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

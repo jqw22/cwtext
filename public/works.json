@@ -1,0 +1,31 @@
+{
+"volumes": [
+{"number":"1","sort_order":1,"title":"Psychiatric Studies","year_published":1957,"notes":""},
+{"number":"2","sort_order":2,"title":"Experimental Researches","year_published":1973,"notes":""},
+{"number":"3","sort_order":3,"title":"The Psychogenesis of Mental Disease","year_published":1960,"notes":""},
+{"number":"4","sort_order":4,"title":"Freud and Psychoanalysis","year_published":1961,"notes":""},
+{"number":"5","sort_order":5,"title":"Symbols of Transformation","year_published":1956,"notes":""},
+{"number":"6","sort_order":6,"title":"Psychological Types","year_published":1971,"notes":""},
+{"number":"7","sort_order":7,"title":"Two Essays on Analytical Psychology","year_published":1953,"notes":""},
+{"number":"8","sort_order":8,"title":"The Structure and Dynamics of the Psyche","year_published":1960,"notes":""},
+{"number":"9.1","sort_order":9.1,"title":"The Archetypes and the Collective Unconscious","year_published":1959,"notes":""},
+{"number":"9.2","sort_order":9.2,"title":"Aion: Researches into the Phenomenology of the Self","year_published":1959,"notes":""},
+{"number":"10","sort_order":10,"title":"Civilization in Transition","year_published":1964,"notes":""},
+{"number":"11","sort_order":11,"title":"Psychology and Religion: West and East","year_published":1958,"notes":""},
+{"number":"12","sort_order":12,"title":"Psychology and Alchemy","year_published":1953,"notes":""},
+{"number":"13","sort_order":13,"title":"Alchemical Studies","year_published":1967,"notes":""},
+{"number":"14","sort_order":14,"title":"Mysterium Coniunctionis","year_published":1963,"notes":""},
+{"number":"15","sort_order":15,"title":"The Spirit in Man, Art, and Literature","year_published":1966,"notes":""},
+{"number":"16","sort_order":16,"title":"The Practice of Psychotherapy","year_published":1954,"notes":""},
+{"number":"17","sort_order":17,"title":"The Development of Personality","year_published":1954,"notes":""},
+{"number":"18","sort_order":18,"title":"The Symbolic Life","year_published":1976,"notes":""},
+{"number":"19","sort_order":19,"title":"General Bibliography","year_published":1979,"notes":""},
+{"number":"20","sort_order":20,"title":"General Index","year_published":1979,"notes":""}
+],
+"works": [
+{"id":"00000000-0000-4000-8000-000000000004","title":"Answer to Job","original_title":"Antwort auf Hiob","original_language":"German","kind":"book","volume":"11","para_from":553,"para_to":758,"year_written":1951,"year_written_note":null,"year_first_published":1952,"year_first_published_note":null,"first_published_in":"Rascher, Zurich","revisions":null,"notes":"","tag":"11 - answer to job"},
+{"id":"00000000-0000-4000-8000-000000000001","title":"Symbols of Transformation: Introduction","original_title":"Wandlungen und Symbole der Libido: Einleitung","original_language":"German","kind":"essay","volume":"5","para_from":1,"para_to":3,"year_written":null,"year_written_note":null,"year_first_published":1911,"year_first_published_note":null,"first_published_in":"Jahrbuch für psychoanalytische und psychopathologische Forschungen","revisions":"1952: revised as Symbole der Wandlung","notes":"","tag":"05 - symbols of transformation - introduction"},
+{"id":"00000000-0000-4000-8000-000000000003","title":"The Psychological Aspects of the Kore","original_title":"Zum psychologischen Aspekt der Korefigur","original_language":"German","kind":"essay","volume":"9.1","para_from":306,"para_to":383,"year_written":null,"year_written_note":null,"year_first_published":1941,"year_first_published_note":null,"first_published_in":"C. G. Jung and K. Kerényi, Das göttliche Mädchen","revisions":null,"notes":"","tag":"09.1 - the psychological aspects of the kore"},
+{"id":"00000000-0000-4000-8000-000000000002","title":"Two Kinds of Thinking","original_title":"Über die zwei Arten des Denkens","original_language":"German","kind":"essay","volume":"5","para_from":4,"para_to":46,"year_written":null,"year_written_note":null,"year_first_published":1911,"year_first_published_note":null,"first_published_in":"Jahrbuch für psychoanalytische und psychopathologische Forschungen","revisions":"1952: revised as Symbole der Wandlung","notes":"","tag":"05 - two kinds of thinking"}
+]
+}
