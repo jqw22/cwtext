@@ -9,7 +9,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { WorkForm } from '@/components/works/WorkForm';
 import { useCurator } from '@/hooks/useCurator';
 import { useStructuredNotes } from '@/hooks/useStructuredNotes';
-import { useDeleteWork, useSaveWork, useWorks } from '@/hooks/useWorks';
+import { useDeleteWork, useNoteWorks, useSaveWork, useWorks } from '@/hooks/useWorks';
 import { useToast } from '@/hooks/useToast';
 import { cwReference, sortWorks, type WorkOrder } from '@/lib/works';
 import type { WorkInput, WorkRow } from '@/lib/dbWorks';
@@ -52,13 +52,9 @@ export function WorksPage() {
     description: "Jung's essays and books with the dates they were written and first published.",
   });
 
-  const noteCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const note of notes ?? []) {
-      for (const tag of note.tags) counts.set(tag, (counts.get(tag) ?? 0) + 1);
-    }
-    return counts;
-  }, [notes]);
+  const { notesPerWork } = useNoteWorks(notes);
+  // Text names notes still carry, offered when filling in a work's old text name
+  const tags = useMemo(() => [...new Set((notes ?? []).flatMap((n) => n.tags))].sort(), [notes]);
 
   const volumes = useMemo(() => data?.volumes ?? [], [data]);
   const volumeTitles = useMemo(() => new Map(volumes.map((v) => [v.number, v])), [volumes]);
@@ -150,7 +146,7 @@ export function WorksPage() {
               </thead>
               <tbody>
                 {works.map((work, i) => {
-                  const count = work.tag ? noteCounts.get(work.tag) ?? 0 : 0;
+                  const count = notesPerWork.get(work.id) ?? 0;
                   const volume = work.volume ? volumeTitles.get(work.volume) : undefined;
                   // In volume order, a heading starts each volume
                   const newVolume = order === 'volume' && (i === 0 || works[i - 1].volume !== work.volume);
@@ -188,7 +184,7 @@ export function WorksPage() {
                         <td className="py-2 pr-4 hidden md:table-cell">{work.original_language}</td>
                         <td className="py-2 text-right">
                           {count > 0
-                            ? <Link to={`/?tag=${encodeURIComponent(work.tag!)}`} className="underline hover:text-primary">{count}</Link>
+                            ? <Link to={`/?${new URLSearchParams({ ...(work.volume ? { vol: work.volume } : {}), text: work.id })}`} className="underline hover:text-primary">{count}</Link>
                             : <span className="text-muted-foreground/50">—</span>}
                         </td>
                         {canEdit && (
@@ -218,7 +214,7 @@ export function WorksPage() {
               <WorkForm
                 work={editing === 'new' ? undefined : editing}
                 volumes={volumes}
-                tags={[...noteCounts.keys()].sort()}
+                tags={tags}
                 onSubmit={handleSave}
                 onCancel={() => setEditing(null)}
                 isSubmitting={isSaving}

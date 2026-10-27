@@ -1,26 +1,31 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { X, Plus, Loader2, Hash, Check, Globe } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/useToast';
-import { cn } from '@/lib/utils';
+import { WorkSelect } from '@/components/works/WorkSelect';
+import type { VolumeRow, WorkRow } from '@/lib/dbWorks';
+
+export interface NoteFormData {
+  title: string;
+  content: string;
+  /** The text (work) the paragraph belongs to */
+  workId: string | null;
+  order?: string;
+}
 
 interface NoteFormProps {
   /** Initial values for editing */
   initialTitle?: string;
   initialContent?: string;
-  initialTags?: string[];
+  initialWorkId?: string;
   initialOrder?: string;
-  /** Existing texts from all notes, with counts — shown as suggestions */
-  availableTags?: Map<string, number>;
-  onSubmit: (data: {
-    title: string;
-    content: string;
-    tags: string[];
-    order?: string;
-  }) => Promise<void>;
+  /** The volumes and works to choose the note's text from */
+  volumes: VolumeRow[];
+  works: WorkRow[];
+  onSubmit: (data: NoteFormData) => Promise<void>;
   onCancel?: () => void;
   isSubmitting?: boolean;
 }
@@ -28,9 +33,10 @@ interface NoteFormProps {
 export function NoteForm({
   initialTitle = '',
   initialContent = '',
-  initialTags = [],
+  initialWorkId = '',
   initialOrder = '',
-  availableTags,
+  volumes,
+  works,
   onSubmit,
   onCancel,
   isSubmitting = false,
@@ -38,29 +44,8 @@ export function NoteForm({
   const [title, setTitle] = useState(initialTitle);
   const [order, setOrder] = useState(initialOrder);
   const [content, setContent] = useState(initialContent);
-  const [tags, setTags] = useState<string[]>(initialTags);
-  const [tagInput, setTagInput] = useState('');
-  const [tagSearch, setTagSearch] = useState('');
+  const [workId, setWorkId] = useState(initialWorkId);
   const { toast } = useToast();
-
-  const handleAddTag = (tag?: string) => {
-    const trimmed = (tag ?? tagInput).trim().toLowerCase();
-    if (trimmed && !tags.includes(trimmed)) {
-      setTags([...tags, trimmed]);
-      setTagInput('');
-    }
-  };
-
-  const handleTagKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleAddTag();
-    }
-  };
-
-  const removeTag = (tag: string) => {
-    setTags(tags.filter((t) => t !== tag));
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,33 +85,10 @@ export function NoteForm({
     await onSubmit({
       title: title.trim(),
       content: content.trim(),
-      tags,
+      workId: workId || null,
       order: orderValue,
     });
   };
-
-  // Filter and sort available tags for suggestions
-  const suggestedTags = useMemo(() => {
-    if (!availableTags || availableTags.size === 0) return [];
-
-    const entries = Array.from(availableTags.entries());
-
-    // Filter by tag search
-    const filtered = tagSearch.trim()
-      ? entries.filter(([t]) => t.includes(tagSearch.toLowerCase()))
-      : entries;
-
-    // Sort: selected first, then by count desc, then alpha
-    return filtered
-      .sort((a, b) => {
-        const aSel = tags.includes(a[0]) ? -1 : 1;
-        const bSel = tags.includes(b[0]) ? -1 : 1;
-        if (aSel !== bSel) return aSel - bSel;
-        if (b[1] !== a[1]) return b[1] - a[1];
-        return a[0].localeCompare(b[0]);
-      })
-      .slice(0, 50); // cap at 50
-  }, [availableTags, tagSearch, tags]);
 
   return (
     <Card>
@@ -166,110 +128,20 @@ export function NoteForm({
             />
           </div>
 
-          {/* Tags */}
+          {/* Text */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">Texts</label>
-
-            {/* Type a new tag */}
-            <div className="flex gap-2">
-              <Input
-                value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                onKeyDown={handleTagKeyDown}
-                placeholder="Type a new text and press Enter..."
-                disabled={isSubmitting}
-                className="flex-1"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={() => handleAddTag()}
-                disabled={isSubmitting || !tagInput.trim()}
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
-
-            {/* Selected tags */}
-            {tags.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary text-primary-foreground"
-                  >
-                    #{tag}
-                    <button
-                      type="button"
-                      onClick={() => removeTag(tag)}
-                      className="hover:opacity-70 transition-opacity"
-                      disabled={isSubmitting}
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-
-            {/* Existing tags to pick from */}
-            {availableTags && availableTags.size > 0 && (
-              <div className="mt-3 bg-muted/30 rounded-lg p-3 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Globe className="h-3 w-3" />
-                    <span>Existing tags from all notes</span>
-                  </div>
-                  {availableTags.size > 15 && (
-                    <div className="relative w-36">
-                      <Hash className="absolute left-1.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-                      <Input
-                        value={tagSearch}
-                        onChange={(e) => setTagSearch(e.target.value)}
-                        placeholder="Search texts..."
-                        className="h-6 text-[11px] pl-5"
-                      />
-                    </div>
-                  )}
-                </div>
-                <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
-                  {suggestedTags.map(([tag, count]) => {
-                    const isSelected = tags.includes(tag);
-                    return (
-                      <button
-                        key={tag}
-                        type="button"
-                        onClick={() =>
-                          isSelected ? removeTag(tag) : handleAddTag(tag)
-                        }
-                        disabled={isSubmitting}
-                        className={cn(
-                          'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-all border',
-                          isSelected
-                            ? 'bg-primary/15 text-primary border-primary/40'
-                            : 'bg-background text-muted-foreground border-border hover:border-primary/30 hover:text-foreground',
-                        )}
-                      >
-                        {isSelected && <Check className="h-3 w-3" />}
-                        #{tag}
-                        <span className={cn(
-                          'text-[10px]',
-                          isSelected ? 'opacity-70' : 'opacity-50',
-                        )}>
-                          {count}
-                        </span>
-                      </button>
-                    );
-                  })}
-                  {suggestedTags.length === 0 && tagSearch.trim() && (
-                    <p className="text-xs text-muted-foreground italic">
-                      No tags match "{tagSearch}"
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
+            <label htmlFor="note-work" className="text-sm font-medium">Text</label>
+            <WorkSelect
+              id="note-work"
+              volumes={volumes}
+              works={works}
+              value={workId}
+              onChange={setWorkId}
+              disabled={isSubmitting}
+            />
+            <p className="text-xs text-muted-foreground">
+              A text that isn't listed can be added on the Works page.
+            </p>
           </div>
 
           {/* Content */}

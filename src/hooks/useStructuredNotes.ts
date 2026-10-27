@@ -15,8 +15,10 @@ export interface StructuredNote {
   title: string;
   /** Main text body */
   content: string;
-  /** The texts the paragraph belongs to */
+  /** The texts the paragraph belongs to (the old way of naming its work) */
   tags: string[];
+  /** The work (essay or book) the paragraph belongs to */
+  workId: string | null;
   /** Original publish timestamp (Unix seconds) */
   publishedAt?: number;
   /** Slug, used in the note's link */
@@ -42,6 +44,7 @@ export function rowToNote(row: NoteRow): StructuredNote {
     title: row.para || 'Untitled',
     content: row.body ?? '',
     tags: [...new Set((row.tags ?? []).map(normalizeTag).filter(Boolean))],
+    workId: row.work_id ?? null,
     publishedAt: row.published_at ? Math.floor(Date.parse(row.published_at) / 1000) : undefined,
     id: row.slug,
     createdAt: Math.floor(Date.parse(row.updated_at) / 1000),
@@ -89,7 +92,7 @@ function byOrder(a: StructuredNote, b: StructuredNote): number {
 const NOTES_KEY = ['notes'];
 
 /** localStorage key for the last full set of notes */
-const CACHE_KEY = 'cwtext:notes:v2';
+const CACHE_KEY = 'cwtext:notes:v3';
 
 function readCache(): { notes: StructuredNote[]; savedAt: number } | undefined {
   try {
@@ -171,6 +174,8 @@ interface SaveNoteParams {
   title: string;
   content: string;
   tags?: string[];
+  /** The work the note belongs to */
+  workId?: string | null;
   /** Numeric order for sequencing (to 1dp) */
   order?: string;
   /** Slug of an existing note to replace */
@@ -191,7 +196,7 @@ export function useSaveNote() {
   return useMutation({
     mutationFn: async (params: SaveNoteParams) => {
       if (!supabase) throw new Error('No note database is configured');
-      const { title, content, tags = [], order, dtag } = params;
+      const { title, content, tags = [], workId = null, order, dtag } = params;
 
       const row = await saveDbNote(supabase, {
         slug: dtag ?? crypto.randomUUID(),
@@ -199,6 +204,7 @@ export function useSaveNote() {
         sort_order: order ? Number(order) : null,
         body: content,
         tags: [...new Set(tags.map(normalizeTag).filter(Boolean))],
+        work_id: workId,
         // An edit keeps the note's original date
         ...(dtag ? {} : { published_at: new Date().toISOString() }),
       });

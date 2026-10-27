@@ -1,49 +1,54 @@
 import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Upload } from 'lucide-react';
 import { useToast } from '@/hooks/useToast';
-import { useSaveNote, normalizeTag, type StructuredNote } from '@/hooks/useStructuredNotes';
+import { useSaveNote, type StructuredNote } from '@/hooks/useStructuredNotes';
+import { WorkSelect } from '@/components/works/WorkSelect';
+import type { VolumeRow, WorkRow } from '@/lib/dbWorks';
 import { parseNotesFile, noteContent, type ParsedDocument } from '@/lib/parseNotesDocument';
 
 interface NoteImportProps {
   /** Notes already saved, so ones with the same para. and text are skipped */
   existingNotes: StructuredNote[];
-  /** Existing texts from all notes, with counts — shown as suggestions */
-  availableTags?: Map<string, number>;
+  volumes: VolumeRow[];
+  works: WorkRow[];
+  /** A note's work id (see workOfNote) */
+  workOf: (note: StructuredNote) => string | null;
+  /** The text chosen to start with */
+  initialWorkId?: string;
   onClose: () => void;
 }
 
 /** Save many notes at once from a Word or plain-text document */
-export function NoteImport({ existingNotes, availableTags, onClose }: NoteImportProps) {
+export function NoteImport({ existingNotes, volumes, works, workOf, initialWorkId = '', onClose }: NoteImportProps) {
   const { toast } = useToast();
   const { mutateAsync: saveNote } = useSaveNote();
   const [fileName, setFileName] = useState('');
   const [parsed, setParsed] = useState<ParsedDocument>();
-  const [text, setText] = useState('');
+  const [workId, setWorkId] = useState(initialWorkId);
   const [includeFootnotes, setIncludeFootnotes] = useState(true);
   const [publishing, setPublishing] = useState(false);
   const [done, setDone] = useState(0);
   // Paras saved in this session, before the note list has caught up
   const [published, setPublished] = useState<Set<string>>(new Set());
 
-  const tag = normalizeTag(text);
+  const work = works.find((w) => w.id === workId);
 
   // Paras already saved under this text
   const existingTitles = useMemo(() => {
     const titles = new Set<string>();
     for (const note of existingNotes) {
-      if (note.tags.includes(tag)) titles.add(note.title);
+      if (workId && workOf(note) === workId) titles.add(note.title);
     }
     for (const key of published) {
-      const [t, title] = key.split('\n');
-      if (t === tag) titles.add(title);
+      const [id, title] = key.split('\n');
+      if (id === workId) titles.add(title);
     }
     return titles;
-  }, [existingNotes, published, tag]);
+  }, [existingNotes, published, workId, workOf]);
 
   const notes = parsed?.notes ?? [];
   const toPublish = notes.filter((n) => !existingTitles.has(n.title));
@@ -64,8 +69,8 @@ export function NoteImport({ existingNotes, availableTags, onClose }: NoteImport
   };
 
   const handlePublish = async () => {
-    if (!tag) {
-      toast({ title: 'Text required', description: 'Enter the text these notes belong to.', variant: 'destructive' });
+    if (!work) {
+      toast({ title: 'Text required', description: 'Choose the text these notes belong to.', variant: 'destructive' });
       return;
     }
     setPublishing(true);
@@ -77,14 +82,15 @@ export function NoteImport({ existingNotes, availableTags, onClose }: NoteImport
         await saveNote({
           title: note.title,
           content: noteContent(note, includeFootnotes),
-          tags: [tag],
+          tags: work.tag ? [work.tag] : [],
+          workId: work.id,
           order: note.order,
         });
         count++;
         setDone(count);
-        setPublished((prev) => new Set(prev).add(`${tag}\n${note.title}`));
+        setPublished((prev) => new Set(prev).add(`${work.id}\n${note.title}`));
       }
-      toast({ title: 'Notes saved', description: `${count} note${count !== 1 ? 's' : ''} saved under "${tag}".` });
+      toast({ title: 'Notes saved', description: `${count} note${count !== 1 ? 's' : ''} saved under "${work.title}".` });
     } catch (err) {
       toast({
         title: `Stopped after ${count} note${count !== 1 ? 's' : ''}`,
@@ -131,17 +137,14 @@ export function NoteImport({ existingNotes, availableTags, onClose }: NoteImport
         {/* Text */}
         <div className="space-y-2">
           <label htmlFor="import-text" className="text-sm font-medium">Text</label>
-          <Input
+          <WorkSelect
             id="import-text"
-            list="import-text-options"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="e.g. 09.1 - the psychological aspects of the kore"
+            volumes={volumes}
+            works={works}
+            value={workId}
+            onChange={setWorkId}
             disabled={publishing}
           />
-          <datalist id="import-text-options">
-            {[...(availableTags?.keys() ?? [])].sort().map((t) => <option key={t} value={t} />)}
-          </datalist>
         </div>
 
         {/* Footnotes */}

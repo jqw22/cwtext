@@ -8,12 +8,14 @@ export interface NoteRow {
   sort_order: number | string | null;
   body: string;
   tags: string[];
+  /** The work (essay or book) the paragraph belongs to */
+  work_id: string | null;
   published_at: string | null;
   created_at: string;
   updated_at: string;
 }
 
-const COLUMNS = 'id, slug, para, sort_order, body, tags, published_at, created_at, updated_at';
+const COLUMNS = 'id, slug, para, sort_order, body, tags, work_id, published_at, created_at, updated_at';
 
 /** Rows per request; Supabase caps a response at 1000 by default */
 const PAGE_SIZE = 1000;
@@ -55,7 +57,7 @@ export async function fetchDbNote(
 }
 
 /** The fields written when saving a note; the database fills in the rest */
-export type NoteInput = Pick<NoteRow, 'slug' | 'para' | 'sort_order' | 'body' | 'tags'> & {
+export type NoteInput = Pick<NoteRow, 'slug' | 'para' | 'sort_order' | 'body' | 'tags' | 'work_id'> & {
   published_at?: string | null;
 };
 

@@ -1,6 +1,9 @@
+import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { deleteDbWork, fetchDbWorks, saveDbWork, type WorkInput, type WorksData } from '@/lib/dbWorks';
+import { deleteDbWork, fetchDbWorks, saveDbWork, type WorkInput, type WorkRow, type WorksData } from '@/lib/dbWorks';
+import { workOfNote } from '@/lib/works';
+import type { StructuredNote } from '@/hooks/useStructuredNotes';
 
 /** The nightly copy of the works that ships with the site, or undefined if missing */
 async function fetchWorksFromBackup(signal: AbortSignal): Promise<WorksData | undefined> {
@@ -63,4 +66,29 @@ export function useDeleteWork() {
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: WORKS_KEY }),
   });
+}
+
+/**
+ * The works, with each note's work and how many notes each work and volume
+ * has. `workOf` gives a note's work id (see workOfNote).
+ */
+export function useNoteWorks(notes: StructuredNote[] | undefined) {
+  const { data } = useWorks();
+
+  return useMemo(() => {
+    const works = data?.works ?? [];
+    const volumes = data?.volumes ?? [];
+    const workById = new Map<string, WorkRow>(works.map((w) => [w.id, w]));
+    const workOf = workOfNote(works);
+    const notesPerWork = new Map<string, number>();
+    const notesPerVolume = new Map<string, number>();
+    for (const note of notes ?? []) {
+      const id = workOf(note);
+      if (!id) continue;
+      notesPerWork.set(id, (notesPerWork.get(id) ?? 0) + 1);
+      const volume = workById.get(id)?.volume;
+      if (volume) notesPerVolume.set(volume, (notesPerVolume.get(volume) ?? 0) + 1);
+    }
+    return { volumes, works, workById, workOf, notesPerWork, notesPerVolume, fromBackup: data?.fromBackup };
+  }, [data, notes]);
 }

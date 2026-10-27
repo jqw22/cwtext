@@ -4,8 +4,10 @@ import { useSeoMeta } from '@unhead/react';
 import { useStructuredNote, useSaveNote, useDbNoteCount } from '@/hooks/useStructuredNotes';
 import { useCurator } from '@/hooks/useCurator';
 import { useToast } from '@/hooks/useToast';
-import { NoteForm } from '@/components/notes/NoteForm';
-import { Badge } from '@/components/ui/badge';
+import { NoteForm, type NoteFormData } from '@/components/notes/NoteForm';
+import { WorkSummary } from '@/components/works/WorkSummary';
+import { useWorks } from '@/hooks/useWorks';
+import { workOfNote } from '@/lib/works';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Clock, Pencil } from 'lucide-react';
@@ -18,6 +20,10 @@ export function NotePage() {
   const { mutateAsync: saveNote, isPending: isSaving } = useSaveNote();
   const { toast } = useToast();
   const [editing, setEditing] = useState(false);
+  const { data: worksData } = useWorks();
+  const works = worksData?.works ?? [];
+  const workId = note ? workOfNote(works)(note) : null;
+  const work = works.find((w) => w.id === workId);
 
   // Editing needs the database itself (see Index)
   const { data: dbCount } = useDbNoteCount(isCurator);
@@ -32,12 +38,14 @@ export function NotePage() {
     description: note?.content.slice(0, 160) ?? 'A paragraph from the texts of C. G. Jung',
   });
 
-  const handleEdit = async (data: { title: string; content: string; tags: string[]; order?: string }) => {
+  const handleEdit = async (data: NoteFormData) => {
     if (!note) return;
+    // A note's text name follows its work, so search and older copies still match
+    const tag = works.find((w) => w.id === data.workId)?.tag;
     try {
-      await saveNote({ ...data, dtag: note.id });
+      await saveNote({ ...data, tags: tag ? [tag] : [], dtag: note.id });
       setEditing(false);
-      toast({ title: 'Note updated', description: 'Texts and content saved.' });
+      toast({ title: 'Note updated', description: 'Text and content saved.' });
     } catch (err) {
       toast({
         title: 'Update failed',
@@ -100,7 +108,9 @@ export function NotePage() {
           <NoteForm
             initialTitle={note.title}
             initialContent={note.content}
-            initialTags={note.tags}
+            initialWorkId={workId ?? undefined}
+            volumes={worksData?.volumes ?? []}
+            works={works}
             initialOrder={note.order !== Infinity ? String(note.order) : ''}
             onSubmit={handleEdit}
             onCancel={() => setEditing(false)}
@@ -143,11 +153,9 @@ export function NotePage() {
           </div>
         </div>
 
-        {note.tags.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-6">
-            {note.tags.map((tag) => (
-              <Badge key={tag} variant="secondary">#{tag}</Badge>
-            ))}
+        {work && (
+          <div className="mb-6">
+            <WorkSummary work={work} />
           </div>
         )}
 
