@@ -1,11 +1,12 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useSeoMeta } from '@unhead/react';
 import { CuratorLogin } from '@/components/auth/CuratorLogin';
-import { NoteForm } from '@/components/notes/NoteForm';
+import { NoteForm, type NoteFormData } from '@/components/notes/NoteForm';
 import { NoteImport } from '@/components/notes/NoteImport';
 import { NoteCard } from '@/components/notes/NoteCard';
 import { SearchFilters } from '@/components/notes/SearchFilters';
+import { TextPicker, type TextSelection } from '@/components/notes/TextPicker';
 import { ExportODTButton } from '@/components/notes/ExportODTButton';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -18,19 +19,23 @@ import {
   normalizeTag,
 } from '@/hooks/useStructuredNotes';
 import { useToast } from '@/hooks/useToast';
-import { useWorks } from '@/hooks/useWorks';
+import { useNoteWorks } from '@/hooks/useWorks';
 import { WorkSummary } from '@/components/works/WorkSummary';
+import { volumeLabel } from '@/lib/works';
 
 const Index = () => {
   const { isCurator } = useCurator();
   const { toast } = useToast();
   const [showCuratedForm, setShowCuratedForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
-  // Search text (?q=) and tags (?tag=, repeatable) live in the URL, so Back
-  // from a paragraph returns to the same results and a filtered view can be shared
+  // Search text (?q=), volume (?vol=) and text (?text=, a work id) live in the URL,
+  // so Back from a paragraph returns to the same results and a view can be shared
   const [searchParams, setSearchParams] = useSearchParams();
   const search = searchParams.get('q') ?? '';
-  const selectedTags = useMemo(() => searchParams.getAll('tag').map(normalizeTag), [searchParams]);
+  const selection: TextSelection = useMemo(
+    () => ({ volume: searchParams.get('vol') ?? '', text: searchParams.get('text') ?? '' }),
+    [searchParams],
+  );
 
   const setSearch = useCallback((value: string) => {
     setSearchParams((prev) => {
@@ -41,28 +46,36 @@ const Index = () => {
     }, { replace: true });
   }, [setSearchParams]);
 
-  const setSelectedTags = useCallback((update: (prev: string[]) => string[]) => {
+  const setSelection = useCallback(({ volume, text }: TextSelection) => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       next.delete('tag');
-      for (const tag of update(prev.getAll('tag'))) next.append('tag', tag);
+      if (volume) next.set('vol', volume);
+      else next.delete('vol');
+      if (text) next.set('text', text);
+      else next.delete('text');
       return next;
     }, { replace: true });
   }, [setSearchParams]);
 
-  const hasSearched = search.trim().length > 0 || selectedTags.length > 0;
+  const hasSearched = search.trim().length > 0 || !!selection.volume || !!selection.text;
 
-  // All curated notes load once; search and tags filter them in the browser
+  // All curated notes load once; search and the chosen text filter them in the browser
   const { data: notes, isLoading, error, refetch } = useStructuredNotes();
 
   const { mutateAsync: saveNote, isPending: isSaving } = useSaveNote();
 
-  // Dates and details of the selected texts, when they have been entered as works
-  const { data: worksData } = useWorks();
-  const selectedWorks = useMemo(
-    () => (worksData?.works ?? []).filter((w) => w.tag && selectedTags.includes(w.tag)),
-    [worksData, selectedTags],
-  );
+  const { volumes, works, workById, workOf, notesPerWork, notesPerVolume } = useNoteWorks(notes);
+  const selectedWork = selection.text ? workById.get(selection.text) : undefined;
+  const selectedVolume = volumes.find((v) => v.number === selection.volume);
+
+  // Older links filter by text name (?tag=); turn them into the same text's work
+  useEffect(() => {
+    const tags = searchParams.getAll('tag').map(normalizeTag);
+    if (tags.length === 0 || works.length === 0) return;
+    const work = works.find((w) => w.tag && tags.includes(w.tag));
+    setSelection({ volume: work?.volume ?? '', text: work?.id ?? '' });
+  }, [searchParams, works, setSelection]);
 
   // Editing needs the database itself; while only the backup can be read, it waits
   const { data: dbCount } = useDbNoteCount(isCurator);
@@ -73,61 +86,58 @@ const Index = () => {
     description: 'Search, browse by text, and export selected paragraphs from the texts of C. G. Jung.',
   });
 
-  // Tag counts across the whole collection
-  const tagCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const note of notes ?? []) {
-      for (const tag of note.tags) {
-        counts.set(tag, (counts.get(tag) || 0) + 1);
-      }
-    }
-    return counts;
-  }, [notes]);
-
   // Filter curated notes (already sorted by order)
   const filteredNotes = useMemo(() => {
     if (!notes || !hasSearched) return [];
 
     let result = notes;
 
-    if (selectedTags.length > 0) {
-      result = result.filter((note) =>
-        selectedTags.some((tag) => note.tags.includes(tag)),
-      );
+    if (selection.text) {
+      result = result.filter((note) => workOf(note) === selection.text);
+    } else if (selection.volume) {
+      result = result.filter((note) => {
+        const id = workOf(note);
+        return !!id && workById.get(id)?.volume === selection.volume;
+      });
     }
 
     const q = search.trim().toLowerCase();
     if (q) {
-      result = result.filter(
-        (note) =>
-          note.title.toLowerCase().includes(q) ||
+      result = result.filter((note) => {
+        const id = workOf(note);
+        const work = id ? workById.get(id) : undefined;
+        return note.title.toLowerCase().includes(q) ||
           note.content.toLowerCase().includes(q) ||
-          note.tags.some((t) => t.toLowerCase().includes(q)),
-      );
+          !!work?.title.toLowerCase().includes(q);
+      });
     }
 
     return result;
-  }, [notes, selectedTags, search, hasSearched]);
+  }, [notes, selection, search, hasSearched, workOf, workById]);
 
-  const handleAddTag = useCallback((tag: string) => {
-    setSelectedTags((prev) => (prev.includes(tag) ? prev : [...prev, tag]));
-  }, [setSelectedTags]);
+  // The chosen volume and text, for the filter row and the export's header
+  const filterLabels = [
+    selectedVolume && { label: volumeLabel(selectedVolume), onRemove: () => setSelection({ volume: '', text: '' }) },
+    selectedWork && { label: selectedWork.title, onRemove: () => setSelection({ volume: selection.volume, text: '' }) },
+  ].filter((f) => !!f);
 
-  const handleRemoveTag = useCallback((tag: string) => {
-    setSelectedTags((prev) => prev.filter((t) => t !== tag));
-  }, [setSelectedTags]);
+  /** A note's text name follows its work, so search and older copies still match */
+  const withTags = useCallback((data: NoteFormData) => {
+    const tag = data.workId ? workById.get(data.workId)?.tag : undefined;
+    return { ...data, tags: tag ? [tag] : [] };
+  }, [workById]);
 
   const handleCreateNote = useCallback(
-    async (data: { title: string; content: string; tags: string[]; order?: string }) => {
+    async (data: NoteFormData) => {
       try {
-        await saveNote(data);
+        await saveNote(withTags(data));
         setShowCuratedForm(false);
         toast({ title: 'Note saved', description: `"${data.title}" has been added.` });
       } catch (err) {
         toast({ title: 'Failed to save', description: err instanceof Error ? err.message : 'An error occurred.', variant: 'destructive' });
       }
     },
-    [saveNote, toast],
+    [saveNote, toast, withTags],
   );
 
   return (
@@ -139,29 +149,36 @@ const Index = () => {
             <img src={`${import.meta.env.BASE_URL}icon-192.png`} alt="" className="h-6 w-6" />
             <h1 className="text-xl font-bold">Selected Texts of C.G. Jung</h1>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 sm:gap-3">
             <Button asChild variant="ghost" size="sm">
               <Link to="/works" aria-label="Works"><BookOpen className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">Works</span></Link>
             </Button>
-            <ExportODTButton notes={filteredNotes} title="cwtext_export" filterTags={selectedTags} />
+            <ExportODTButton notes={filteredNotes} title="cwtext_export" filterTags={filterLabels.map((f) => f.label)} />
             <CuratorLogin />
           </div>
         </div>
       </header>
 
       <main className="container py-6">
-        {/* Search & Tags — full width */}
-        <SearchFilters
-          search={search}
-          onSearchChange={setSearch}
-          selectedTags={selectedTags}
-          onRemoveTag={handleRemoveTag}
-          availableTags={tagCounts}
-          onAddTag={handleAddTag}
-          onClearAll={() => setSearchParams({}, { replace: true })}
-          isLoading={isLoading}
-          onRetry={error ? () => refetch() : undefined}
-        />
+        {/* Volume and text, then search — full width */}
+        <div className="space-y-4">
+          <TextPicker
+            volumes={volumes}
+            works={works}
+            notesPerWork={notesPerWork}
+            notesPerVolume={notesPerVolume}
+            value={selection}
+            onChange={setSelection}
+            isLoading={isLoading}
+            onRetry={error ? () => refetch() : undefined}
+          />
+          <SearchFilters
+            search={search}
+            onSearchChange={setSearch}
+            filters={filterLabels}
+            onClearAll={() => setSearchParams({}, { replace: true })}
+          />
+        </div>
 
         <div className="mt-6 space-y-6">
             {/* Action bar */}
@@ -174,7 +191,7 @@ const Index = () => {
                 </p>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  Use the search bar above or click a text to find passages
+                  Choose a volume or text, or search, to find passages
                 </p>
               )}
               {isCurator && (
@@ -212,7 +229,9 @@ const Index = () => {
                 onSubmit={handleCreateNote}
                 onCancel={() => setShowCuratedForm(false)}
                 isSubmitting={isSaving}
-                availableTags={tagCounts}
+                volumes={volumes}
+                works={works}
+                initialWorkId={selection.text || undefined}
               />
             )}
 
@@ -220,7 +239,10 @@ const Index = () => {
             {showImport && canEdit && (
               <NoteImport
                 existingNotes={notes ?? []}
-                availableTags={tagCounts}
+                volumes={volumes}
+                works={works}
+                workOf={workOf}
+                initialWorkId={selection.text || undefined}
                 onClose={() => setShowImport(false)}
               />
             )}
@@ -231,7 +253,7 @@ const Index = () => {
                 <Search className="h-16 w-16 mx-auto mb-6 text-muted-foreground/20" />
                 <h2 className="text-2xl font-semibold mb-3">Find a passage</h2>
                 <p className="text-muted-foreground max-w-md mx-auto text-lg">
-                  Click a text or search by keyword above to browse passages.
+                  Choose a volume or text above, or search by keyword, to browse passages.
                 </p>
               </div>
             )}
@@ -269,10 +291,10 @@ const Index = () => {
               </div>
             )}
 
-            {/* The selected texts' dates and place in the Collected Works */}
-            {selectedWorks.length > 0 && (
-              <div className="mx-auto w-fit max-w-full space-y-1">
-                {selectedWorks.map((work) => <WorkSummary key={work.id} work={work} />)}
+            {/* The chosen text's dates and place in the Collected Works */}
+            {selectedWork && (
+              <div className="mx-auto w-fit max-w-full">
+                <WorkSummary work={selectedWork} />
               </div>
             )}
 

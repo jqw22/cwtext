@@ -9,7 +9,7 @@ const key = process.env.SUPABASE_ANON_KEY || 'sb_publishable_GrT7F0e8IzRZ6aoaMPD
 const out = process.env.NOTES_FILE || 'public/notes.json';
 const worksOut = process.env.WORKS_FILE || 'public/works.json';
 
-const COLUMNS = 'id,slug,para,sort_order,body,tags,published_at,created_at,updated_at';
+const COLUMNS = 'id,slug,para,sort_order,body,tags,work_id,published_at,created_at,updated_at';
 const PAGE_SIZE = 1000;
 
 /** Every row of a table, in the given order */

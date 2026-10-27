@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { VolumeRow, WorkRow } from './dbWorks';
-import { cwReference, sortWorks } from './works';
+import { cwReference, sortWorks, workOfNote } from './works';
 
 const volumes = [
   { number: '5', sort_order: 5 },
@@ -49,5 +49,18 @@ describe('cwReference', () => {
     expect(cwReference({ volume: '5', para_from: 4, para_to: 4 })).toBe('CW 5, ¶4');
     expect(cwReference({ volume: '5', para_from: null, para_to: null })).toBe('CW 5');
     expect(cwReference({ volume: null, para_from: 1, para_to: 2 })).toBe('');
+  });
+});
+
+describe('workOfNote', () => {
+  const find = workOfNote([work('Job', { id: 'job', tag: '11 - answer to job' })]);
+
+  it('uses the note\'s link to a work', () => {
+    expect(find({ workId: 'kore', tags: ['11 - answer to job'] })).toBe('kore');
+  });
+
+  it('falls back to the work whose text the note carries', () => {
+    expect(find({ workId: null, tags: ['other', '11 - answer to job'] })).toBe('job');
+    expect(find({ workId: null, tags: ['other'] })).toBeNull();
   });
 });

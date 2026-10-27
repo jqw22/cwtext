@@ -40,3 +40,17 @@ export function cwReference(work: Pick<WorkRow, 'volume' | 'para_from' | 'para_t
     : from ?? to;
   return paras !== null ? `CW ${work.volume}, ¶${paras}` : `CW ${work.volume}`;
 }
+
+/**
+ * A function giving a note's work id: its link to a work, or for a note
+ * saved before notes were linked, the work whose text (tag) it carries.
+ */
+export function workOfNote(works: WorkRow[]): (note: { workId: string | null; tags: string[] }) => string | null {
+  const byTag = new Map(works.filter((w) => w.tag).map((w) => [w.tag!, w.id]));
+  return (note) => note.workId ?? note.tags.map((t) => byTag.get(t)).find((id) => id !== undefined) ?? null;
+}
+
+/** A volume label, e.g. 'CW 9.1: The Archetypes and the Collective Unconscious' */
+export function volumeLabel(volume: Pick<VolumeRow, 'number' | 'title'>): string {
+  return `CW ${volume.number}: ${volume.title}`;
+}

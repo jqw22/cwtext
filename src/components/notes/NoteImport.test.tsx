@@ -7,7 +7,7 @@ describe('NoteImport', () => {
   it('previews the notes in a file', async () => {
     render(
       <TestApp>
-        <NoteImport existingNotes={[]} onClose={() => {}} />
+        <NoteImport existingNotes={[]} volumes={[]} works={[]} workOf={() => null} onClose={() => {}} />
       </TestApp>,
     );
 

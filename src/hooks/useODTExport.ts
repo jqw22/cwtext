@@ -84,7 +84,7 @@ function generateODT(notes: StructuredNote[], title?: string, tags?: string[]): 
 
   // Active filter tags in header (if any)
   if (tags && tags.length > 0) {
-    const tagStr = tags.map((t) => `#${escapeXml(t)}`).join(', ');
+    const tagStr = tags.join(' · ');
     contentBody += `<text:p text:style-name="Tags">Texts: ${escapeXml(tagStr)}</text:p>\n`;
   }
 

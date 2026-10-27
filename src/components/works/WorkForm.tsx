@@ -164,7 +164,7 @@ export function WorkForm({ work, volumes, tags, onSubmit, onCancel, isSubmitting
           <Textarea id="work-notes" value={fields.notes} onChange={set('notes')} rows={3} />
         </div>
         <div className="space-y-1.5 sm:col-span-2">
-          <Label htmlFor="work-tag">Text its notes carry</Label>
+          <Label htmlFor="work-tag">Old text name <span className="font-normal text-muted-foreground">(optional, links notes saved before texts were chosen from this list)</span></Label>
           <Input id="work-tag" value={fields.tag} onChange={set('tag')} list="work-tags" placeholder="e.g. 11 - answer to job" />
           <datalist id="work-tags">
             {tags.map((tag) => <option key={tag} value={tag} />)}

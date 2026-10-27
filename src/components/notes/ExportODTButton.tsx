@@ -60,13 +60,16 @@ export function ExportODTButton({
       disabled={isExporting || notes.length === 0}
       variant={variant}
       className={className}
+      aria-label={`Export ${notes.length} notes as ODT`}
     >
       {isExporting ? (
-        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+        <Loader2 className="h-4 w-4 animate-spin sm:mr-2" />
       ) : (
-        <FileDown className="mr-2 h-4 w-4" />
+        <FileDown className="h-4 w-4 sm:mr-2" />
       )}
-      {isExporting ? 'Exporting...' : `Export ODT (${notes.length})`}
+      {/* On a phone the header only has room for the icon and count */}
+      <span className="hidden sm:inline">{isExporting ? 'Exporting...' : 'Export ODT'}</span>
+      <span className="ml-1 sm:ml-0">{` (${notes.length})`}</span>
     </Button>
   );
 }
