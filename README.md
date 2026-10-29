@@ -39,6 +39,10 @@ To set it up:
 
 Redeploy the function after any change to that file.
 
+## Margin notes
+
+Signed-in readers can keep private notes beside the texts. Select some words in a paragraph and choose **Add note**, or use **+ Note** for the whole paragraph. The words get a soft underline and the note sits in the right margin (under the paragraph on a phone). **My notes** in the account menu lists them all. Each note is visible only to the reader who wrote it, enforced by row-level security in `supabase/annotations.sql`, which must be run once in the SQL editor. A note remembers its words, so it still finds them if the paragraph is later edited.
+
 ## Archived: private notes
 
 Earlier versions let logged-in users keep their own NIP-44 encrypted notes beside the texts. That feature has been archived for now. The last version that includes it is commit `d3da174`, which can be restored from git history.

@@ -21,6 +21,7 @@ import {
   type StructuredNote,
 } from '@/hooks/useStructuredNotes';
 import { useToast } from '@/hooks/useToast';
+import { useAnnotations } from '@/hooks/useAnnotations';
 import { useNoteWorks } from '@/hooks/useWorks';
 import { WorkSummary } from '@/components/works/WorkSummary';
 import { sourceLine, volumeLabel } from '@/lib/works';
@@ -30,6 +31,8 @@ const Index = () => {
   const { userId, isCurator } = useCurator();
   // Visitors can read by volume and text; searching needs an account
   const signedIn = !!userId;
+  // The reader's own margin notes
+  const { byNote: annotationsByNote } = useAnnotations(userId);
   const { toast } = useToast();
   const [showCuratedForm, setShowCuratedForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -202,7 +205,7 @@ const Index = () => {
             filters={filterLabels}
             onClearAll={() => setSearchParams({}, { replace: true })}
           />
-          {signedIn && <AskPanel notes={notes ?? []} sourceOf={sourceOf} />}
+          {signedIn && <AskPanel notes={notes ?? []} sourceOf={sourceOf} annotationsByNote={annotationsByNote} />}
         </div>
 
         <div className="mt-6 space-y-6">
@@ -330,7 +333,15 @@ const Index = () => {
               <div className="mx-auto w-fit max-w-full">
                 {filteredNotes.map((note) => (
                   // With one text chosen, its summary above already says where the paragraphs come from
-                  <NoteCard key={note.id} note={note} highlight={search} matchCase={matchCase} source={selectedWork ? undefined : sourceOf(note)} />
+                  <NoteCard
+                    key={note.id}
+                    note={note}
+                    highlight={search}
+                    matchCase={matchCase}
+                    source={selectedWork ? undefined : sourceOf(note)}
+                    annotations={annotationsByNote.get(note.id)}
+                    canAnnotate={signedIn}
+                  />
                 ))}
               </div>
             )}
