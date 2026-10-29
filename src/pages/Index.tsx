@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useSeoMeta } from '@unhead/react';
-import { CuratorLogin } from '@/components/auth/CuratorLogin';
+import { AccountMenu } from '@/components/auth/AccountMenu';
 import { NoteForm, type NoteFormData } from '@/components/notes/NoteForm';
 import { NoteImport } from '@/components/notes/NoteImport';
 import { NoteCard } from '@/components/notes/NoteCard';
@@ -154,7 +154,7 @@ const Index = () => {
               <Link to="/works" aria-label="Works"><BookOpen className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">Works</span></Link>
             </Button>
             <ExportODTButton notes={filteredNotes} title="cwtext_export" filterTags={filterLabels.map((f) => f.label)} />
-            <CuratorLogin />
+            <AccountMenu />
           </div>
         </div>
       </header>
