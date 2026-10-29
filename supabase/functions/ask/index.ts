@@ -4,12 +4,14 @@
 // Deploy as an Edge Function named "ask" (keep "Verify JWT" on) and add the secret
 // ANTHROPIC_API_KEY. Run supabase/ask.sql first. Supabase provides SUPABASE_URL and
 // SUPABASE_ANON_KEY itself. ASK_DAILY_LIMIT (optional) sets questions per reader per day.
+// ASK_TEST_PARAS (optional, for testing) sends only that many paragraphs, so a test costs almost nothing.
 import Anthropic from 'npm:@anthropic-ai/sdk@^1.3.0';
 import { createClient } from 'npm:@supabase/supabase-js@^2.118.0';
 
 const DAILY_LIMIT = Number(Deno.env.get('ASK_DAILY_LIMIT') ?? '20');
 const MAX_QUESTION = 500;
 const MAX_PASSAGES = 12;
+const TEST_PARAS = Number(Deno.env.get('ASK_TEST_PARAS') ?? '0');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -100,7 +102,7 @@ Deno.serve(async (req) => {
     supabase.from('works').select('id, title, volume'),
   ]);
   if (notesResult.error || worksResult.error) return json({ error: 'Couldn’t read the texts. Try again.' }, 502);
-  const notes = notesResult.data as NoteRow[];
+  const notes = TEST_PARAS > 0 ? (notesResult.data as NoteRow[]).slice(0, TEST_PARAS) : notesResult.data as NoteRow[];
   const ids = new Set(notes.map((n) => n.slug));
 
   const client = new Anthropic({ apiKey });

@@ -34,7 +34,7 @@ To set it up:
 
 1. Run `supabase/ask.sql` in the SQL editor.
 2. Create an API key at console.anthropic.com.
-3. In Supabase, go to Edge Functions → Secrets and add `ANTHROPIC_API_KEY` with that key. Optionally add `ASK_DAILY_LIMIT` to change the limit of 20.
+3. In Supabase, go to Edge Functions → Secrets and add `ANTHROPIC_API_KEY` with that key. Optionally add `ASK_DAILY_LIMIT` to change the limit of 20. To test cheaply, add `ASK_TEST_PARAS` set to `1`: Claude then reads only the first paragraph. Delete that secret when you're done testing.
 4. Go to Edge Functions → Deploy a new function → Via editor, name it `ask`, paste in `supabase/functions/ask/index.ts` and deploy. Keep "Verify JWT" on. With the Supabase CLI, `supabase functions deploy ask` does the same.
 
 Redeploy the function after any change to that file.
