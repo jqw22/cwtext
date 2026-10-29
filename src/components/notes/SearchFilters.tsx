@@ -3,6 +3,8 @@ import { Badge } from '@/components/ui/badge';
 import { Search, X, Filter } from 'lucide-react';
 
 interface SearchFiltersProps {
+  /** Only signed-in readers get the search box; visitors just see the filters */
+  canSearch: boolean;
   search: string;
   onSearchChange: (value: string) => void;
   /** The chosen volume and text, shown as removable filters */
@@ -12,29 +14,31 @@ interface SearchFiltersProps {
 }
 
 /** The search box and the row of active filters */
-export function SearchFilters({ search, onSearchChange, filters, onClearAll }: SearchFiltersProps) {
+export function SearchFilters({ canSearch, search, onSearchChange, filters, onClearAll }: SearchFiltersProps) {
   const hasActiveFilters = filters.length > 0 || search.trim().length > 0;
 
   return (
     <div className="space-y-4">
       {/* Search input */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          value={search}
-          onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="Search notes by title, content, or text..."
-          className="pl-10"
-        />
-        {search && (
-          <button
-            onClick={() => onSearchChange('')}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        )}
-      </div>
+      {canSearch && (
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder="Search notes by title, content, or text..."
+            className="pl-10"
+          />
+          {search && (
+            <button
+              onClick={() => onSearchChange('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Active filters indicator */}
       {hasActiveFilters && (

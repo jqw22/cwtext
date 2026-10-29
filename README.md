@@ -26,6 +26,19 @@ Every night the "Back up notes" GitHub Action saves all notes to `public/notes.j
 
 Notes were originally published on Nostr. Old `/naddr1…` links redirect to the same note.
 
+## Search
+
+Visitors who aren't signed in can only read, by choosing a volume and text. Signed-in readers also get keyword search and **Ask**, where Claude reads every paragraph and picks the ones that answer a question in plain words, saying why each fits. Ask runs in the `ask` Supabase Edge Function (`supabase/functions/ask/index.ts`), so the Claude API key never reaches the browser. Each reader can ask 20 questions a day, counted by `supabase/ask.sql`.
+
+To set it up:
+
+1. Run `supabase/ask.sql` in the SQL editor.
+2. Create an API key at console.anthropic.com.
+3. In Supabase, go to Edge Functions → Secrets and add `ANTHROPIC_API_KEY` with that key. Optionally add `ASK_DAILY_LIMIT` to change the limit of 20.
+4. Go to Edge Functions → Deploy a new function → Via editor, name it `ask`, paste in `supabase/functions/ask/index.ts` and deploy. Keep "Verify JWT" on. With the Supabase CLI, `supabase functions deploy ask` does the same.
+
+Redeploy the function after any change to that file.
+
 ## Archived: private notes
 
 Earlier versions let logged-in users keep their own NIP-44 encrypted notes beside the texts. That feature has been archived for now. The last version that includes it is commit `d3da174`, which can be restored from git history.
