@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { TestApp } from '@/test/TestApp';
 import type { StructuredNote } from '@/hooks/useStructuredNotes';
+import { FunctionsHttpError } from '@supabase/supabase-js';
 import { AskPanel } from './AskPanel';
 
 const invoke = vi.fn();
@@ -36,5 +37,20 @@ describe('AskPanel', () => {
     expect(screen.queryByText('Unrelated.')).not.toBeInTheDocument();
     expect(screen.queryByText('Missing.')).not.toBeInTheDocument();
     expect(screen.getByText('19 questions left today')).toBeInTheDocument();
+  });
+
+  it('shows why Supabase turned the question away', async () => {
+    const response = new Response(JSON.stringify({ code: 401, message: 'Invalid JWT' }), { status: 401 });
+    invoke.mockResolvedValue({ data: null, error: new FunctionsHttpError(response) });
+    render(
+      <TestApp>
+        <AskPanel notes={[]} />
+      </TestApp>,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText(/Ask a question/), { target: { value: 'anything' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Ask' }));
+
+    await waitFor(() => expect(screen.getByText('Ask isn’t available right now (401: Invalid JWT).')).toBeInTheDocument());
   });
 });
