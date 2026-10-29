@@ -168,10 +168,14 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex items-center justify-between h-16">
-          <div className="flex items-center gap-3">
-            <img src={`${import.meta.env.BASE_URL}icon-192.png`} alt="" className="h-6 w-6" />
-            <h1 className="text-xl font-bold">Selected Texts of C.G. Jung</h1>
+        <div className="container flex items-center justify-between gap-2 h-16">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <img src={`${import.meta.env.BASE_URL}icon-192.png`} alt="" className="h-6 w-6 shrink-0 max-[359px]:hidden" />
+            {/* Two fixed lines on phones so the title never breaks mid-phrase */}
+            <h1 className="text-sm max-[359px]:text-[13px] sm:text-lg md:text-xl font-bold leading-tight">
+              <span className="block sm:inline whitespace-nowrap">Selected Texts</span>{' '}
+              <span className="block sm:inline whitespace-nowrap">of C.G. Jung</span>
+            </h1>
           </div>
           <div className="flex items-center gap-1 sm:gap-3">
             <Button asChild variant="ghost" size="sm">
