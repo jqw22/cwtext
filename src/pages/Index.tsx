@@ -23,6 +23,7 @@ import { useToast } from '@/hooks/useToast';
 import { useNoteWorks } from '@/hooks/useWorks';
 import { WorkSummary } from '@/components/works/WorkSummary';
 import { volumeLabel } from '@/lib/works';
+import { matchesAll, searchTerms } from '@/lib/highlight';
 
 const Index = () => {
   const { userId, isCurator } = useCurator();
@@ -104,14 +105,13 @@ const Index = () => {
       });
     }
 
-    const q = search.trim().toLowerCase();
-    if (q) {
+    // Every word, or "quoted phrase", must appear in the paragraph, its number or its text's title
+    const terms = searchTerms(search);
+    if (terms.length > 0) {
       result = result.filter((note) => {
         const id = workOf(note);
         const work = id ? workById.get(id) : undefined;
-        return note.title.toLowerCase().includes(q) ||
-          note.content.toLowerCase().includes(q) ||
-          !!work?.title.toLowerCase().includes(q);
+        return matchesAll(`${note.title}\n${note.content}\n${work?.title ?? ''}`, terms);
       });
     }
 

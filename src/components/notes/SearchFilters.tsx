@@ -26,7 +26,7 @@ export function SearchFilters({ canSearch, search, onSearchChange, filters, onCl
           <Input
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Search notes by title, content, or text..."
+            placeholder='Search by words, or "an exact phrase"...'
             className="pl-10"
           />
           {search && (
