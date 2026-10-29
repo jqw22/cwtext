@@ -8,7 +8,7 @@ Live at https://jqw22.github.io/cwtext/
 
 The paragraphs live in a Postgres database on Supabase (project "CGJ"). `supabase/schema.sql` sets up the `notes` table and the security rules: anyone can read, and only accounts listed in `curators` can change notes. The site reads the database directly from the browser using the publishable key in `src/lib/supabase.ts`.
 
-Anyone can create an account by signing in with an emailed link (the "Sign in" button in the header). `supabase/profiles.sql` gives each account a private profile (an optional display name) and lets readers close their own account from the Account dialog. An ordinary account can't change the shared notes. To give an account editing rights, sign in with it once, then run in the Supabase SQL editor:
+Readers can have their own accounts (the "Sign in" button in the header). `supabase/profiles.sql` gives each account a private profile (an optional display name) and lets readers close their own account from the Account dialog. An ordinary account can't change the shared notes. To give an account editing rights, sign in with it once, then run in the Supabase SQL editor:
 
 ```sql
 insert into public.curators (user_id) select id from auth.users where email = 'you@example.com';
