@@ -4,6 +4,8 @@ import { useSeoMeta } from '@unhead/react';
 import { useStructuredNote, useSaveNote, useDbNoteCount } from '@/hooks/useStructuredNotes';
 import { useCurator } from '@/hooks/useCurator';
 import { useToast } from '@/hooks/useToast';
+import { useAnnotations } from '@/hooks/useAnnotations';
+import { AnnotatedText } from '@/components/notes/AnnotatedText';
 import { NoteForm, type NoteFormData } from '@/components/notes/NoteForm';
 import { WorkSummary } from '@/components/works/WorkSummary';
 import { useWorks } from '@/hooks/useWorks';
@@ -16,7 +18,8 @@ import { ArrowLeft, Clock, Pencil } from 'lucide-react';
 export function NotePage() {
   const { slug: id = '' } = useParams<{ slug: string }>();
   const { data: note, isLoading, error } = useStructuredNote(id);
-  const { isCurator } = useCurator();
+  const { userId, isCurator } = useCurator();
+  const { byNote: annotationsByNote } = useAnnotations(userId);
   const { mutateAsync: saveNote, isPending: isSaving } = useSaveNote();
   const { toast } = useToast();
   const [editing, setEditing] = useState(false);
@@ -125,7 +128,7 @@ export function NotePage() {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container max-w-3xl mx-auto flex items-center justify-between h-16">
+        <div className="container max-w-3xl lg:max-w-5xl mx-auto flex items-center justify-between h-16">
           <Button asChild variant="ghost" size="sm">
             <Link to={backTo} className="flex items-center gap-2">
               <ArrowLeft className="h-4 w-4" />
@@ -141,7 +144,8 @@ export function NotePage() {
         </div>
       </header>
 
-      <article className="container max-w-3xl mx-auto py-8 px-4">
+      {/* Wider on large screens, to leave room for margin notes */}
+      <article className="container max-w-3xl lg:max-w-5xl mx-auto py-8 px-4">
         <h1 className="text-3xl font-bold leading-tight mb-4">
           {note.title}
         </h1>
@@ -159,10 +163,14 @@ export function NotePage() {
           </div>
         )}
 
-        <div className="mb-12 max-w-prose">
-          {note.content.split('\n').map((line, i) => (
-            <p key={i} className="mb-3 leading-relaxed">{line || '\u00A0'}</p>
-          ))}
+        <div className="mb-12">
+          <AnnotatedText
+            noteSlug={note.id}
+            text={note.content}
+            annotations={annotationsByNote.get(note.id)}
+            canAnnotate={!!userId}
+            className="leading-relaxed"
+          />
         </div>
       </article>
     </div>

@@ -5,16 +5,19 @@ import { Input } from '@/components/ui/input';
 import { NoteCard } from '@/components/notes/NoteCard';
 import { useAsk } from '@/hooks/useAsk';
 import type { StructuredNote } from '@/hooks/useStructuredNotes';
+import type { Annotation } from '@/lib/annotations';
 
 interface AskPanelProps {
   /** All notes, to show the paragraphs Claude picks */
   notes: StructuredNote[];
   /** Where a paragraph comes from, shown above it */
   sourceOf?: (note: StructuredNote) => string | undefined;
+  /** The reader's own margin notes, by paragraph */
+  annotationsByNote?: Map<string, Annotation[]>;
 }
 
 /** Ask a question in plain words; Claude picks the paragraphs that answer it */
-export function AskPanel({ notes, sourceOf }: AskPanelProps) {
+export function AskPanel({ notes, sourceOf, annotationsByNote }: AskPanelProps) {
   const [question, setQuestion] = useState('');
   const { mutate: ask, data: answer, error, isPending, reset } = useAsk();
   const byId = new Map(notes.map((n) => [n.id, n]));
@@ -64,7 +67,7 @@ export function AskPanel({ notes, sourceOf }: AskPanelProps) {
               return note && (
                 <div key={p.id}>
                   <p className="pt-4 -mb-3 text-xs italic text-muted-foreground max-w-prose ml-16">{p.why}</p>
-                  <NoteCard note={note} source={sourceOf?.(note)} />
+                  <NoteCard note={note} source={sourceOf?.(note)} annotations={annotationsByNote?.get(note.id)} canAnnotate />
                 </div>
               );
             })}

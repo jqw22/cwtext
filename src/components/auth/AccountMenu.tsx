@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { KeyRound, LogOut, Mail, UserRound } from 'lucide-react';
+import { KeyRound, LogOut, Mail, NotebookPen, UserRound } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -38,6 +39,7 @@ export function AccountMenu() {
   const { userId, email, isCurator, checkError } = useCurator();
   const { data: profile } = useProfile(userId);
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [address, setAddress] = useState('');
@@ -67,6 +69,10 @@ export function AccountMenu() {
                   : 'Signed in'}
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => navigate('/my-notes')}>
+              <NotebookPen className="mr-2 h-4 w-4" />
+              My notes
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setSettingsOpen(true)}>
               <UserRound className="mr-2 h-4 w-4" />
               Account
