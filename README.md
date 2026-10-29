@@ -14,7 +14,9 @@ Anyone can create an account by signing in with an emailed link (the "Sign in" b
 insert into public.curators (user_id) select id from auth.users where email = 'you@example.com';
 ```
 
-Supabase's built-in email only delivers to the project's own team members and only a few messages an hour, so reader sign-in needs a custom SMTP sender (Authentication → Emails → SMTP settings) and "Allow new users to sign up" turned on (Authentication → Sign In / Providers).
+Readers can sign in with a password or an emailed link. To add a reader by hand, open Authentication → Users → Add user → Create new user in the Supabase dashboard, enter their email and a password, and tick "Auto confirm". No email is sent. They can change the password in the Account dialog.
+
+Supabase's built-in email only delivers to the project's own team members, a few messages an hour. Letting readers sign up for themselves with emailed links needs a custom SMTP sender (Authentication → Emails → SMTP settings) and "Allow new users to sign up" turned on (Authentication → Sign In / Providers).
 
 ## Works
 

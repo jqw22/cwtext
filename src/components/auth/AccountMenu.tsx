@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LogOut, Mail, UserRound } from 'lucide-react';
+import { KeyRound, LogOut, Mail, UserRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -29,7 +29,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useCurator, sendSignInLink, signOut } from '@/hooks/useCurator';
+import { useCurator, sendSignInLink, signInWithPassword, changePassword, signOut } from '@/hooks/useCurator';
 import { useProfile, useUpdateProfile, deleteMyAccount } from '@/hooks/useProfile';
 import { useToast } from '@/hooks/useToast';
 
@@ -41,6 +41,9 @@ export function AccountMenu() {
   const [open, setOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [address, setAddress] = useState('');
+  const [password, setPassword] = useState('');
+  // Accounts added by hand in the dashboard have a password; anyone else gets an emailed link
+  const [useLink, setUseLink] = useState(false);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
 
@@ -91,10 +94,20 @@ export function AccountMenu() {
     e.preventDefault();
     setSending(true);
     try {
-      await sendSignInLink(address.trim());
-      setSent(true);
+      if (useLink) {
+        await sendSignInLink(address.trim());
+        setSent(true);
+      } else {
+        await signInWithPassword(address.trim(), password);
+        setPassword('');
+        setOpen(false);
+      }
     } catch (err) {
-      toast({ title: 'Could not send the link', description: err instanceof Error ? err.message : 'An error occurred.', variant: 'destructive' });
+      toast({
+        title: useLink ? 'Could not send the link' : 'Could not sign in',
+        description: err instanceof Error ? err.message : 'An error occurred.',
+        variant: 'destructive',
+      });
     } finally {
       setSending(false);
     }
@@ -102,7 +115,7 @@ export function AccountMenu() {
 
   return (
     <>
-      <Button variant="ghost" size="sm" onClick={() => { setSent(false); setOpen(true); }}>
+      <Button variant="ghost" size="sm" onClick={() => { setSent(false); setUseLink(false); setOpen(true); }}>
         Sign in
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
@@ -112,24 +125,43 @@ export function AccountMenu() {
             <DialogDescription>
               {sent
                 ? `A sign-in link is on its way to ${address.trim()}. Open it on this device to finish signing in.`
-                : 'Enter your email and we’ll send you a link to sign in. If you’re new, this creates your account. No password needed.'}
+                : useLink
+                  ? 'Enter your email and we’ll send you a link to sign in.'
+                  : 'Sign in with your email and password.'}
             </DialogDescription>
           </DialogHeader>
           {!sent && (
-            <form onSubmit={handleSend} className="flex gap-2">
+            <form onSubmit={handleSend} className="space-y-3">
               <Input
                 type="email"
                 required
                 autoFocus
+                autoComplete="email"
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
                 placeholder="you@example.com"
                 disabled={sending}
               />
-              <Button type="submit" disabled={sending || !address.trim()}>
-                <Mail className="mr-2 h-4 w-4" />
-                Send link
-              </Button>
+              {!useLink && (
+                <Input
+                  type="password"
+                  required
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Password"
+                  disabled={sending}
+                />
+              )}
+              <div className="flex items-center justify-between gap-2">
+                <Button type="button" variant="link" size="sm" className="px-0" onClick={() => setUseLink(!useLink)} disabled={sending}>
+                  {useLink ? 'Use a password instead' : 'Email me a sign-in link instead'}
+                </Button>
+                <Button type="submit" disabled={sending || !address.trim() || (!useLink && !password)}>
+                  {useLink ? <Mail className="mr-2 h-4 w-4" /> : <KeyRound className="mr-2 h-4 w-4" />}
+                  {useLink ? 'Send link' : 'Sign in'}
+                </Button>
+              </div>
             </form>
           )}
         </DialogContent>
@@ -153,11 +185,16 @@ function AccountDialog({ open, onOpenChange, userId, email, displayName, hasProf
   const { toast } = useToast();
   const updateProfile = useUpdateProfile(userId);
   const [name, setName] = useState(displayName);
+  const [newPassword, setNewPassword] = useState('');
+  const [savingPassword, setSavingPassword] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   const handleOpenChange = (next: boolean) => {
-    if (next) setName(displayName);
+    if (next) {
+      setName(displayName);
+      setNewPassword('');
+    }
     onOpenChange(next);
   };
 
@@ -168,6 +205,20 @@ function AccountDialog({ open, onOpenChange, userId, email, displayName, hasProf
       onOpenChange(false);
     } catch (err) {
       toast({ title: 'Could not save your name', description: err instanceof Error ? err.message : 'An error occurred.', variant: 'destructive' });
+    }
+  };
+
+  const handlePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingPassword(true);
+    try {
+      await changePassword(newPassword);
+      setNewPassword('');
+      toast({ title: 'Password changed' });
+    } catch (err) {
+      toast({ title: 'Could not change your password', description: err instanceof Error ? err.message : 'An error occurred.', variant: 'destructive' });
+    } finally {
+      setSavingPassword(false);
     }
   };
 
@@ -213,6 +264,23 @@ function AccountDialog({ open, onOpenChange, userId, email, displayName, hasProf
           ) : (
             <p className="text-sm text-muted-foreground">Account settings aren’t available yet.</p>
           )}
+          <form onSubmit={handlePassword} className="space-y-2">
+            <Label htmlFor="new-password">New password</Label>
+            <div className="flex gap-2">
+              <Input
+                id="new-password"
+                type="password"
+                autoComplete="new-password"
+                minLength={6}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                disabled={savingPassword}
+              />
+              <Button type="submit" disabled={savingPassword || newPassword.length < 6}>
+                Change
+              </Button>
+            </div>
+          </form>
           {!isCurator && hasProfile && (
             <DialogFooter className="sm:justify-start border-t pt-4">
               <Button variant="ghost" size="sm" className="text-destructive" onClick={() => setConfirmDelete(true)}>
