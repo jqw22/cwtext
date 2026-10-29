@@ -18,12 +18,15 @@ export function useAsk() {
       if (!supabase) throw new Error('This copy of the site has no database.');
       const { data, error } = await supabase.functions.invoke<AskAnswer>('ask', { body: { question } });
       if (error) {
-        // The function explains what went wrong in the body
+        // The function explains what went wrong in the body; Supabase itself uses `message`
         if (error instanceof FunctionsHttpError) {
-          const body = await error.context.json().catch(() => undefined);
+          const response = error.context as Response;
+          const body = await response.json().catch(() => undefined);
           if (typeof body?.error === 'string') throw new Error(body.error);
+          const reason = typeof body?.message === 'string' ? `: ${body.message}` : '';
+          throw new Error(`Ask isn’t available right now (${response.status}${reason}).`);
         }
-        throw new Error('Ask isn’t available right now. Try again later.');
+        throw new Error(`Ask isn’t available right now (${error.message}).`);
       }
       return data!;
     },
