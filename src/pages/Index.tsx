@@ -24,14 +24,16 @@ import { WorkSummary } from '@/components/works/WorkSummary';
 import { volumeLabel } from '@/lib/works';
 
 const Index = () => {
-  const { isCurator } = useCurator();
+  const { userId, isCurator } = useCurator();
+  // Visitors can read by volume and text; searching needs an account
+  const signedIn = !!userId;
   const { toast } = useToast();
   const [showCuratedForm, setShowCuratedForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
   // Search text (?q=), volume (?vol=) and text (?text=, a work id) live in the URL,
   // so Back from a paragraph returns to the same results and a view can be shared
   const [searchParams, setSearchParams] = useSearchParams();
-  const search = searchParams.get('q') ?? '';
+  const search = signedIn ? searchParams.get('q') ?? '' : '';
   const selection: TextSelection = useMemo(
     () => ({ volume: searchParams.get('vol') ?? '', text: searchParams.get('text') ?? '' }),
     [searchParams],
@@ -83,7 +85,7 @@ const Index = () => {
 
   useSeoMeta({
     title: 'Selected Texts of C.G. Jung',
-    description: 'Search, browse by text, and export selected paragraphs from the texts of C. G. Jung.',
+    description: 'Browse by text, search, and export selected paragraphs from the texts of C. G. Jung.',
   });
 
   // Filter curated notes (already sorted by order)
@@ -173,6 +175,7 @@ const Index = () => {
             onRetry={error ? () => refetch() : undefined}
           />
           <SearchFilters
+            canSearch={signedIn}
             search={search}
             onSearchChange={setSearch}
             filters={filterLabels}
@@ -191,7 +194,7 @@ const Index = () => {
                 </p>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  Choose a volume or text, or search, to find passages
+                  {signedIn ? 'Choose a volume or text, or search, to find passages' : 'Choose a volume or text to read its passages'}
                 </p>
               )}
               {isCurator && (
@@ -253,7 +256,9 @@ const Index = () => {
                 <Search className="h-16 w-16 mx-auto mb-6 text-muted-foreground/20" />
                 <h2 className="text-2xl font-semibold mb-3">Find a passage</h2>
                 <p className="text-muted-foreground max-w-md mx-auto text-lg">
-                  Choose a volume or text above, or search by keyword, to browse passages.
+                  {signedIn
+                    ? 'Choose a volume or text above, or search by keyword, to browse passages.'
+                    : 'Choose a volume or text above to read its passages. Sign in to search.'}
                 </p>
               </div>
             )}
@@ -286,7 +291,7 @@ const Index = () => {
                 <PenLine className="h-12 w-12 mx-auto mb-4 text-muted-foreground/40" />
                 <h2 className="text-xl font-semibold mb-2">No results</h2>
                 <p className="text-muted-foreground max-w-md mx-auto mb-6">
-                  Try adjusting your search or filter criteria.
+                  {signedIn ? 'Try adjusting your search or filter criteria.' : 'Try another volume or text.'}
                 </p>
               </div>
             )}
