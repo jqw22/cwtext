@@ -52,3 +52,16 @@ describe('splitMatches with several terms', () => {
     ]);
   });
 });
+
+describe('matching case', () => {
+  it('keeps Self and self apart when case must match', () => {
+    const terms = searchTerms('Self', true);
+    expect(terms).toEqual(['Self']);
+    expect(matchesAll('the Self is the whole', terms, true)).toBe(true);
+    expect(matchesAll('the ego and the self', terms, true)).toBe(false);
+    expect(splitMatches('Self and self', 'Self', true)).toEqual([
+      { text: 'Self', match: true },
+      { text: ' and self', match: false },
+    ]);
+  });
+});
