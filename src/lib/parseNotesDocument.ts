@@ -16,6 +16,8 @@ export interface ParsedDocument {
   notes: ImportedNote[];
   /** Paragraphs that came before the first para. number and were left out */
   skipped: string[];
+  /** Things to check by hand before saving */
+  warnings?: string[];
 }
 
 const LABEL = /^\d+(?:\.\d+)?$/;
@@ -122,8 +124,13 @@ export function noteContent(note: ImportedNote, includeFootnotes: boolean): stri
   return `${note.body}\n\n${note.footnotes.join('\n')}`;
 }
 
-/** Read a .docx or plain-text file and split it into notes */
+/** Read a .pdf, .docx or plain-text file and split it into notes */
 export async function parseNotesFile(file: File): Promise<ParsedDocument> {
+  if (/\.pdf$/i.test(file.name)) {
+    const { readPdfItems, pdfToParagraphs } = await import('./parsePdf');
+    const { paragraphs, warnings } = pdfToParagraphs(await readPdfItems(new Uint8Array(await file.arrayBuffer())));
+    return { ...splitIntoNotes(paragraphs), warnings };
+  }
   if (/\.docx$/i.test(file.name)) {
     return splitIntoNotes(docxParagraphs(new Uint8Array(await file.arrayBuffer())));
   }

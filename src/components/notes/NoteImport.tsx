@@ -109,7 +109,9 @@ export function NoteImport({ existingNotes, volumes, works, workOf, initialWorkI
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Choose a Word (.docx) or text file. Each note starts with its para. number on its own line,
+          Choose a PDF of the text, with each paragraph numbered "[1]", "[2]"… in the margin and any
+          notes at the end (each note goes under the paragraph that refers to it), or a
+          Word (.docx) or text file in which each note starts with its para. number on its own line,
           followed by the paragraph and any footnotes beginning "(1)", "(2)"…
         </p>
 
@@ -121,7 +123,7 @@ export function NoteImport({ existingNotes, volumes, works, workOf, initialWorkI
               Choose file
               <input
                 type="file"
-                accept=".docx,.txt,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                accept=".pdf,.docx,.txt,application/pdf,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 className="sr-only"
                 disabled={publishing}
                 onChange={(e) => {
@@ -166,6 +168,14 @@ export function NoteImport({ existingNotes, volumes, works, workOf, initialWorkI
               {parsed && parsed.skipped.length > 0 && `. ${parsed.skipped.length} line${parsed.skipped.length !== 1 ? 's' : ''} before the first para. number left out`}
               .
             </p>
+            {parsed?.warnings && parsed.warnings.length > 0 && (
+              <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 p-3 text-sm space-y-1">
+                <p className="font-medium">Check before saving</p>
+                <ul className="list-disc pl-5 text-muted-foreground">
+                  {parsed.warnings.map((w) => <li key={w}>{w}</li>)}
+                </ul>
+              </div>
+            )}
             <div className="max-h-96 overflow-y-auto rounded-lg border divide-y">
               {notes.map((note) => {
                 const skip = existingTitles.has(note.title);
