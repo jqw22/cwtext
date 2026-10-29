@@ -8,13 +8,15 @@ Live at https://jqw22.github.io/cwtext/
 
 The paragraphs live in a Postgres database on Supabase (project "CGJ"). `supabase/schema.sql` sets up the `notes` table and the security rules: anyone can read, and only accounts listed in `curators` can change notes. The site reads the database directly from the browser using the publishable key in `src/lib/supabase.ts`.
 
-Anyone can create an account by signing in with an emailed link (the "Sign in" button in the header). `supabase/profiles.sql` gives each account a private profile (an optional display name) and lets readers close their own account from the Account dialog. An ordinary account can't change the shared notes. To give an account editing rights, sign in with it once, then run in the Supabase SQL editor:
+Readers can have their own accounts (the "Sign in" button in the header). `supabase/profiles.sql` gives each account a private profile (an optional display name) and lets readers close their own account from the Account dialog. An ordinary account can't change the shared notes. To give an account editing rights, sign in with it once, then run in the Supabase SQL editor:
 
 ```sql
 insert into public.curators (user_id) select id from auth.users where email = 'you@example.com';
 ```
 
-Supabase's built-in email only delivers to the project's own team members and only a few messages an hour, so reader sign-in needs a custom SMTP sender (Authentication → Emails → SMTP settings) and "Allow new users to sign up" turned on (Authentication → Sign In / Providers).
+Readers can sign in with a password or an emailed link. To add a reader by hand, open Authentication → Users → Add user → Create new user in the Supabase dashboard, enter their email and a password, and tick "Auto confirm". No email is sent. They can change the password in the Account dialog.
+
+Supabase's built-in email only delivers to the project's own team members, a few messages an hour. Letting readers sign up for themselves with emailed links needs a custom SMTP sender (Authentication → Emails → SMTP settings) and "Allow new users to sign up" turned on (Authentication → Sign In / Providers).
 
 ## Works
 

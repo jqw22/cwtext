@@ -52,6 +52,20 @@ export async function sendSignInLink(email: string): Promise<void> {
   if (error) throw error;
 }
 
+/** Sign in with a password set for the account in the Supabase dashboard */
+export async function signInWithPassword(email: string, password: string): Promise<void> {
+  if (!supabase) throw new Error('No note database is configured');
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) throw error;
+}
+
+/** Replace the signed-in account's password */
+export async function changePassword(password: string): Promise<void> {
+  if (!supabase) throw new Error('No note database is configured');
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) throw error;
+}
+
 export async function signOut(): Promise<void> {
   await supabase?.auth.signOut();
 }
