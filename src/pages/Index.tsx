@@ -18,11 +18,12 @@ import {
   useSaveNote,
   useDbNoteCount,
   normalizeTag,
+  type StructuredNote,
 } from '@/hooks/useStructuredNotes';
 import { useToast } from '@/hooks/useToast';
 import { useNoteWorks } from '@/hooks/useWorks';
 import { WorkSummary } from '@/components/works/WorkSummary';
-import { volumeLabel } from '@/lib/works';
+import { sourceLine, volumeLabel } from '@/lib/works';
 import { matchesAll, searchTerms } from '@/lib/highlight';
 
 const Index = () => {
@@ -124,6 +125,13 @@ const Index = () => {
     selectedWork && { label: selectedWork.title, onRemove: () => setSelection({ volume: selection.volume, text: '' }) },
   ].filter((f) => !!f);
 
+  /** Where a note comes from, e.g. 'CW 5 · Introduction · written 1911' */
+  const sourceOf = useCallback((note: StructuredNote) => {
+    const id = workOf(note);
+    const work = id ? workById.get(id) : undefined;
+    return work ? sourceLine(work) : undefined;
+  }, [workOf, workById]);
+
   /** A note's text name follows its work, so search and older copies still match */
   const withTags = useCallback((data: NoteFormData) => {
     const tag = data.workId ? workById.get(data.workId)?.tag : undefined;
@@ -182,7 +190,7 @@ const Index = () => {
             filters={filterLabels}
             onClearAll={() => setSearchParams({}, { replace: true })}
           />
-          {signedIn && <AskPanel notes={notes ?? []} />}
+          {signedIn && <AskPanel notes={notes ?? []} sourceOf={sourceOf} />}
         </div>
 
         <div className="mt-6 space-y-6">
@@ -309,7 +317,8 @@ const Index = () => {
             {hasSearched && !isLoading && filteredNotes.length > 0 && (
               <div className="mx-auto w-fit max-w-full">
                 {filteredNotes.map((note) => (
-                  <NoteCard key={note.id} note={note} highlight={search} />
+                  // With one text chosen, its summary above already says where the paragraphs come from
+                  <NoteCard key={note.id} note={note} highlight={search} source={selectedWork ? undefined : sourceOf(note)} />
                 ))}
               </div>
             )}

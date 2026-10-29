@@ -54,3 +54,9 @@ export function workOfNote(works: WorkRow[]): (note: { workId: string | null; ta
 export function volumeLabel(volume: Pick<VolumeRow, 'number' | 'title'>): string {
   return `CW ${volume.number}: ${volume.title}`;
 }
+
+/** Where a paragraph comes from, shown above it in search results, e.g. 'CW 5 · Introduction · written 1911' */
+export function sourceLine(work: Pick<WorkRow, 'volume' | 'title' | 'year_written' | 'year_written_note'>): string {
+  const written = work.year_written ?? work.year_written_note;
+  return [work.volume && `CW ${work.volume}`, work.title, written && `written ${written}`].filter(Boolean).join(' · ');
+}

@@ -9,10 +9,12 @@ import type { StructuredNote } from '@/hooks/useStructuredNotes';
 interface AskPanelProps {
   /** All notes, to show the paragraphs Claude picks */
   notes: StructuredNote[];
+  /** Where a paragraph comes from, shown above it */
+  sourceOf?: (note: StructuredNote) => string | undefined;
 }
 
 /** Ask a question in plain words; Claude picks the paragraphs that answer it */
-export function AskPanel({ notes }: AskPanelProps) {
+export function AskPanel({ notes, sourceOf }: AskPanelProps) {
   const [question, setQuestion] = useState('');
   const { mutate: ask, data: answer, error, isPending, reset } = useAsk();
   const byId = new Map(notes.map((n) => [n.id, n]));
@@ -62,7 +64,7 @@ export function AskPanel({ notes }: AskPanelProps) {
               return note && (
                 <div key={p.id}>
                   <p className="pt-4 -mb-3 text-xs italic text-muted-foreground max-w-prose ml-16">{p.why}</p>
-                  <NoteCard note={note} />
+                  <NoteCard note={note} source={sourceOf?.(note)} />
                 </div>
               );
             })}

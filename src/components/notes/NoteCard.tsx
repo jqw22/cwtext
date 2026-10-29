@@ -6,6 +6,8 @@ interface NoteCardProps {
   note: StructuredNote;
   /** Search text to highlight in the paragraph */
   highlight?: string;
+  /** Where the paragraph comes from, shown above it when results mix texts */
+  source?: string;
 }
 
 /** `text` with each occurrence of `query` marked */
@@ -25,7 +27,7 @@ function Highlighted({ text, query }: { text: string; query: string }) {
   );
 }
 
-function NoteCard({ note, highlight = '' }: NoteCardProps) {
+function NoteCard({ note, highlight = '', source }: NoteCardProps) {
   const location = useLocation();
   return (
     <Link to={`/note/${encodeURIComponent(note.id)}`} state={{ from: location.search }} className="block group">
@@ -33,8 +35,11 @@ function NoteCard({ note, highlight = '' }: NoteCardProps) {
         <h2 className="w-12 shrink-0 text-right text-sm font-bold text-muted-foreground tabular-nums leading-relaxed">
           <Highlighted text={note.title} query={highlight} />
         </h2>
-        <div className="max-w-prose text-sm text-foreground/80 whitespace-pre-line leading-relaxed">
-          <Highlighted text={note.content} query={highlight} />
+        <div className="max-w-prose text-sm text-foreground/80 leading-relaxed">
+          {source && <p className="mb-1 text-xs font-medium text-muted-foreground">{source}</p>}
+          <div className="whitespace-pre-line">
+            <Highlighted text={note.content} query={highlight} />
+          </div>
         </div>
       </article>
     </Link>
