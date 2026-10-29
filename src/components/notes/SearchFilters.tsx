@@ -7,6 +7,9 @@ interface SearchFiltersProps {
   canSearch: boolean;
   search: string;
   onSearchChange: (value: string) => void;
+  /** Whether upper and lower case must match */
+  matchCase: boolean;
+  onMatchCaseChange: (value: boolean) => void;
   /** The chosen volume and text, shown as removable filters */
   filters: { label: string; onRemove: () => void }[];
   /** Clear the search text and every filter at once */
@@ -14,7 +17,7 @@ interface SearchFiltersProps {
 }
 
 /** The search box and the row of active filters */
-export function SearchFilters({ canSearch, search, onSearchChange, filters, onClearAll }: SearchFiltersProps) {
+export function SearchFilters({ canSearch, search, onSearchChange, matchCase, onMatchCaseChange, filters, onClearAll }: SearchFiltersProps) {
   const hasActiveFilters = filters.length > 0 || search.trim().length > 0;
 
   return (
@@ -27,16 +30,29 @@ export function SearchFilters({ canSearch, search, onSearchChange, filters, onCl
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder='Search by words, or "an exact phrase"...'
-            className="pl-10"
+            className="pl-10 pr-20"
           />
-          {search && (
+          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+            {search && (
+              <button
+                onClick={() => onSearchChange('')}
+                aria-label="Clear search"
+                className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
             <button
-              onClick={() => onSearchChange('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              onClick={() => onMatchCaseChange(!matchCase)}
+              aria-pressed={matchCase}
+              title={matchCase ? 'Match case: on (Self and self are different)' : 'Match case: off'}
+              className={`rounded px-1.5 py-0.5 text-xs font-semibold transition-colors ${
+                matchCase ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+              }`}
             >
-              <X className="h-4 w-4" />
+              Aa
             </button>
-          )}
+          </div>
         </div>
       )}
 

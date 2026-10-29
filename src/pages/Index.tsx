@@ -37,6 +37,16 @@ const Index = () => {
   // so Back from a paragraph returns to the same results and a view can be shared
   const [searchParams, setSearchParams] = useSearchParams();
   const search = signedIn ? searchParams.get('q') ?? '' : '';
+  // Upper and lower case must match unless switched off (?case=0), so Self and self stay apart
+  const matchCase = searchParams.get('case') !== '0';
+  const setMatchCase = useCallback((value: boolean) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (value) next.delete('case');
+      else next.set('case', '0');
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
   const selection: TextSelection = useMemo(
     () => ({ volume: searchParams.get('vol') ?? '', text: searchParams.get('text') ?? '' }),
     [searchParams],
@@ -107,17 +117,17 @@ const Index = () => {
     }
 
     // Every word, or "quoted phrase", must appear in the paragraph, its number or its text's title
-    const terms = searchTerms(search);
+    const terms = searchTerms(search, matchCase);
     if (terms.length > 0) {
       result = result.filter((note) => {
         const id = workOf(note);
         const work = id ? workById.get(id) : undefined;
-        return matchesAll(`${note.title}\n${note.content}\n${work?.title ?? ''}`, terms);
+        return matchesAll(`${note.title}\n${note.content}\n${work?.title ?? ''}`, terms, matchCase);
       });
     }
 
     return result;
-  }, [notes, selection, search, hasSearched, workOf, workById]);
+  }, [notes, selection, search, matchCase, hasSearched, workOf, workById]);
 
   // The chosen volume and text, for the filter row and the export's header
   const filterLabels = [
@@ -187,6 +197,8 @@ const Index = () => {
             canSearch={signedIn}
             search={search}
             onSearchChange={setSearch}
+            matchCase={matchCase}
+            onMatchCaseChange={setMatchCase}
             filters={filterLabels}
             onClearAll={() => setSearchParams({}, { replace: true })}
           />
@@ -318,7 +330,7 @@ const Index = () => {
               <div className="mx-auto w-fit max-w-full">
                 {filteredNotes.map((note) => (
                   // With one text chosen, its summary above already says where the paragraphs come from
-                  <NoteCard key={note.id} note={note} highlight={search} source={selectedWork ? undefined : sourceOf(note)} />
+                  <NoteCard key={note.id} note={note} highlight={search} matchCase={matchCase} source={selectedWork ? undefined : sourceOf(note)} />
                 ))}
               </div>
             )}
