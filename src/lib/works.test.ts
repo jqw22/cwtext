@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { VolumeRow, WorkRow } from './dbWorks';
-import { cwReference, sortWorks, workOfNote } from './works';
+import { cwReference, sortWorks, sourceLine, workOfNote } from './works';
 
 const volumes = [
   { number: '5', sort_order: 5 },
@@ -62,5 +62,19 @@ describe('workOfNote', () => {
   it('falls back to the work whose text the note carries', () => {
     expect(find({ workId: null, tags: ['other', '11 - answer to job'] })).toBe('job');
     expect(find({ workId: null, tags: ['other'] })).toBeNull();
+  });
+});
+
+describe('sourceLine', () => {
+  it('gives the volume, title and year written', () => {
+    expect(sourceLine({ volume: '5', title: 'Introduction', year_written: 1911, year_written_note: null }))
+      .toBe('CW 5 · Introduction · written 1911');
+  });
+
+  it('uses the note on the date, and leaves out what is unknown', () => {
+    expect(sourceLine({ volume: null, title: 'Answer to Job', year_written: null, year_written_note: 'about 1951' }))
+      .toBe('Answer to Job · written about 1951');
+    expect(sourceLine({ volume: '9.1', title: 'The Kore', year_written: null, year_written_note: null }))
+      .toBe('CW 9.1 · The Kore');
   });
 });
