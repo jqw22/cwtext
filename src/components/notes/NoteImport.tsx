@@ -109,7 +109,8 @@ export function NoteImport({ existingNotes, volumes, works, workOf, initialWorkI
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Choose a PDF of the text, with each paragraph numbered "[1]", "[2]"… in the margin, or a
+          Choose a PDF of the text, with each paragraph numbered "[1]", "[2]"… in the margin and any
+          notes at the end (each note goes under the paragraph that refers to it), or a
           Word (.docx) or text file in which each note starts with its para. number on its own line,
           followed by the paragraph and any footnotes beginning "(1)", "(2)"…
         </p>

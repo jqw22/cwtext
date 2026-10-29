@@ -52,4 +52,43 @@ describe('pdfToParagraphs', () => {
     expect(paragraphs).toEqual(['7', 'Primitive man impresses us so strongly with his subjectivity that we should have guessed.', '9', 'Next.']);
     expect(warnings).toEqual(['Para. 8 was expected but 9 came next.']);
   });
+
+  it('numbers headings between paragraphs and puts notes from the end under their paragraphs', () => {
+    const marker = (n: number, y: number): PdfItem => ({ str: `[${n}]`, x: 81, y, width: 18, height: 11 });
+    const text: PdfItem[] = [
+      { str: 'THE CONCEPT OF THE COLLECTIVE UNCONSCIOUS', x: 188, y: 700, width: 230, height: 17 },
+      { str: '1', x: 418, y: 706, width: 6, height: 11 },
+      marker(87, 650),
+      line('In what follows I shall try to give (1) a definition and', 649, 135, 400),
+      line('(2) an example.', 630, 92, 100),
+      line('1. Definition', 595, 266, 80),
+      marker(88, 560),
+      line('The collective unconscious is a part of the psyche which', 559, 133, 402),
+      line('is not personal.', 540, 92, 100),
+      { str: '2', x: 192, y: 545, width: 4, height: 8.7 },
+    ];
+    const notesPage: PdfItem[] = [
+      { str: '1 [Originally given as a lecture in London, and later', x: 77, y: 700, width: 457, height: 11.3 },
+      { str: 'revised.—E', x: 77, y: 680, width: 60, height: 11.3 },
+      { str: 'DITORS', x: 137, y: 680, width: 40, height: 8.7 },
+      { str: '.]', x: 177, y: 680, width: 6, height: 11.3 },
+      { str: '2 Psychology and Alchemy.', x: 77, y: 660, width: 200, height: 11.3 },
+    ];
+
+    const { paragraphs, warnings } = pdfToParagraphs([text, notesPage]);
+
+    expect(paragraphs).toEqual([
+      '86.9',
+      'THE CONCEPT OF THE COLLECTIVE UNCONSCIOUS (1)',
+      '(1) [Originally given as a lecture in London, and later revised.—EDITORS.]',
+      '87',
+      'In what follows I shall try to give (1) a definition and (2) an example.',
+      '87.9',
+      '1. Definition',
+      '88',
+      'The collective unconscious is a part of the psyche which is not personal. (2)',
+      '(2) Psychology and Alchemy.',
+    ]);
+    expect(warnings).toEqual([]);
+  });
 });

@@ -26,9 +26,17 @@ interface Line {
   items: PdfItem[];
   x0: number;
   x1: number;
+  /** Size of the line's own text, leaving out footnote markers */
+  size: number;
 }
 
 const PARA_MARK = /^\[(\d+)\]\s*/;
+/** Footnote markers are kept as REF_OPEN n REF_CLOSE until the end, so a "(1)" in the text itself isn't taken for one */
+const REF_OPEN = '\uE000';
+const REF_CLOSE = '\uE001';
+const REF = /\uE000(\d+)\uE001/g;
+
+const isDigits = (it: PdfItem) => /^\s*\d+\s*$/.test(it.str);
 
 /** The font size most of the text is in */
 function bodySize(pages: PdfItem[][]): number {
@@ -49,23 +57,23 @@ function bodySize(pages: PdfItem[][]): number {
   return best;
 }
 
-/** Group a page's items into lines, top to bottom. Small raised digits join the line they sit on. */
+/** Group a page's items into lines, top to bottom. Raised digits join the line they sit on. */
 function pageLines(items: PdfItem[], body: number): Line[] {
-  const isSmall = (it: PdfItem) => it.height > 0 && it.height < body * 0.8;
   const lines: Line[] = [];
-  const main = items.filter((it) => !isSmall(it)).sort((a, b) => b.y - a.y || a.x - b.x);
-  for (const item of main) {
+  // Spaces are left out: words a gap apart are separated again in lineText
+  const words = items.filter((it) => it.str.trim() && !isDigits(it)).sort((a, b) => b.y - a.y || a.x - b.x);
+  for (const item of words) {
     const line = lines.find((l) => Math.abs(l.y - item.y) < body * 0.4);
     if (line) line.items.push(item);
-    else lines.push({ y: item.y, items: [item], x0: 0, x1: 0 });
+    else lines.push({ y: item.y, items: [item], x0: 0, x1: 0, size: 0 });
   }
-  for (const item of items.filter(isSmall)) {
+  for (const item of items.filter(isDigits)) {
     let best: Line | undefined;
     for (const line of lines) {
       if (!best || Math.abs(line.y - item.y) < Math.abs(best.y - item.y)) best = line;
     }
-    if (best && Math.abs(best.y - item.y) < body) best.items.push(item);
-    else lines.push({ y: item.y, items: [item], x0: 0, x1: 0 });
+    if (best && Math.abs(best.y - item.y) < body * 0.7) best.items.push(item);
+    else lines.push({ y: item.y, items: [item], x0: 0, x1: 0, size: 0 });
   }
   lines.sort((a, b) => b.y - a.y);
   for (const line of lines) {
@@ -73,19 +81,26 @@ function pageLines(items: PdfItem[], body: number): Line[] {
     const text = line.items.filter((it) => it.str.trim());
     line.x0 = text.length ? text[0].x : 0;
     line.x1 = Math.max(0, ...text.map((it) => it.x + it.width));
+    line.size = Math.max(0, ...line.items.filter((it) => !isDigits(it) && it.str !== PICTURE).map((it) => it.height));
+    if (!line.size) line.size = Math.max(0, ...line.items.map((it) => it.height));
+    // The baseline of the line's main text, below any raised marker
+    line.y = line.items.find((it) => it.height === line.size)?.y ?? line.y;
   }
   return lines;
 }
 
-/** A line's text, with footnote markers written " (n)" */
+/** Whether an item is a footnote marker: digits smaller than the line's text and raised above it */
+const isRef = (item: PdfItem, line: Line) =>
+  isDigits(item) && item.height < line.size * 0.85 && item.y > line.y + line.size * 0.1;
+
+/** A line's text, with footnote markers kept as REF_OPEN n REF_CLOSE */
 function lineText(line: Line, body: number): string {
   let text = '';
   let prev: PdfItem | undefined;
   for (const item of line.items) {
-    const small = item.height > 0 && item.height < body * 0.8;
     const str = item.str === PICTURE ? PICTURE_TEXT : item.str;
-    if (small && /^\s*\d+\s*$/.test(str)) {
-      text = `${text.trimEnd()} (${str.trim()}) `;
+    if (isRef(item, line)) {
+      text = `${text.trimEnd()} ${REF_OPEN}${str.trim()}${REF_CLOSE} `;
     } else {
       // Items a visible gap apart are separate words even with no space between them
       const gap = prev && item.x - (prev.x + prev.width) > body * 0.15;
@@ -97,86 +112,143 @@ function lineText(line: Line, body: number): string {
   return text.replace(/\s+/g, ' ').trim();
 }
 
+/** Add a line to a paragraph, joining words split across lines with a dash */
+const joinLine = (last: string, text: string) => (/[-—]$/.test(last) ? last + text : `${last} ${text}`);
+
 /**
  * Turn the text of a book-style PDF into notes: each paragraph starts with
  * its number in brackets ("[12]"), footnote markers are small raised
  * digits, and a heading before the first paragraph becomes the title.
- * Short lines end a paragraph within a note, and indented lines (verse)
- * are kept on their own.
+ * A heading between paragraphs (e.g. "1. Definition") becomes a note of
+ * its own numbered just before the next paragraph ("87.9"). Short lines
+ * end a paragraph within a note, and indented lines (verse) are kept on
+ * their own. Notes printed in smaller type, each starting with its number
+ * ("1 [Originally given…"), go under the paragraph that refers to them.
  */
 export function pdfToParagraphs(pages: PdfItem[][]): PdfParagraphs {
   const body = bodySize(pages);
   const warnings: string[] = [];
   const titleParts: string[] = [];
-  /** [para number, paragraphs of text] */
+  /** [para number, paragraphs of text]; a heading's number is left blank until the next para. */
   const notes: [string, string[]][] = [];
+  const footnotes = new Map<number, string>();
+  let lastFootnote = 0;
+  let inFootnotes = false;
   let open = false; // whether the last paragraph of the current note can be continued
 
   const add = (text: string, ownParagraph: boolean) => {
     const parts = notes[notes.length - 1][1];
-    if (open && !ownParagraph && parts.length) {
-      const last = parts[parts.length - 1];
-      parts[parts.length - 1] = /[-—]$/.test(last) ? last + text : `${last} ${text}`;
-    } else {
-      parts.push(text);
-    }
+    if (open && !ownParagraph && parts.length) parts[parts.length - 1] = joinLine(parts[parts.length - 1], text);
+    else parts.push(text);
   };
 
-  for (const items of pages) {
-    const lines = pageLines(items, body);
-    const textLines = lines.filter((l) => l.items.some((it) => it.height >= body * 0.8 && it.str.trim()));
+  // The usual gap between lines, to tell headings (set apart by extra space) from verse
+  const gaps: number[] = [];
+  const pageLineSets = pages.map((items) => pageLines(items, body));
+  for (const lines of pageLineSets) {
+    for (let i = 1; i < lines.length; i++) gaps.push(lines[i - 1].y - lines[i].y);
+  }
+  gaps.sort((a, b) => a - b);
+  const lineGap = gaps.length ? gaps[Math.floor(gaps.length / 2)] : body * 1.3;
+
+  for (const lines of pageLineSets) {
+    let textLines = lines.filter((l) => Math.abs(l.size - body) < body * 0.1);
+    if (textLines.length === 0) textLines = lines;
     if (textLines.length === 0) continue;
     const left = Math.min(...textLines.map((l) => l.x0));
     const right = Math.max(...textLines.map((l) => l.x1));
     const width = right - left;
 
-    for (const line of lines) {
+    lines.forEach((line, i) => {
       let text = lineText(line, body);
-      if (!text) continue;
+      if (!text) return;
+
+      // Notes in smaller type, numbered from 1, once the paragraphs have started
+      const numbered = text.match(/^(\d+)\s+(\S.*)$/);
+      const smaller = line.size < body * 0.9;
+      if (notes.length && smaller && numbered && Number(numbered[1]) === lastFootnote + 1 && (inFootnotes || lastFootnote === 0)) {
+        inFootnotes = true;
+        lastFootnote++;
+        footnotes.set(lastFootnote, numbered[2]);
+        return;
+      }
+      if (inFootnotes) {
+        if (smaller) footnotes.set(lastFootnote, joinLine(footnotes.get(lastFootnote) ?? '', text));
+        return;
+      }
 
       const mark = text.match(PARA_MARK);
       if (mark) {
+        if (notes.length && notes[notes.length - 1][0] === '') {
+          // The heading just before takes its number from this paragraph
+          notes[notes.length - 1][0] = (Number(mark[1]) - 0.1).toFixed(1);
+        }
         notes.push([mark[1], []]);
         open = false;
         text = text.slice(mark[0].length);
-        if (!text) continue;
+        if (!text) return;
       } else if (notes.length === 0) {
         // Before the first paragraph: a large heading is the title, anything else is left out
-        if (line.items.some((it) => it.height > body * 1.05)) {
-          titleParts.push(text.replace(/\s*\(\d+\)$/, ''));
-          const ref = text.match(/\((\d+)\)$/);
-          if (ref) titleParts.push(`(${ref[1]})`);
+        if (line.size > body * 1.05) titleParts.push(text);
+        return;
+      }
+
+      if (!mark) {
+        const above = i > 0 ? lines[i - 1].y - line.y : Infinity;
+        const below = i < lines.length - 1 ? line.y - lines[i + 1].y : Infinity;
+        const indent = line.x0 - left;
+        const centred = indent > width * 0.02 && Math.abs(indent - (right - line.x1)) < width * 0.1;
+        if (centred && above > lineGap * 1.4 && below > lineGap * 1.4) {
+          notes.push(['', [text]]);
+          open = false;
+          return;
         }
-        continue;
       }
 
       const verse = !mark && line.x0 - left > width * 0.1;
       add(text, verse);
       // A line stopping well short of the margin ends its paragraph; verse lines stand alone
       open = !verse && right - line.x1 < width * 0.1;
-    }
+    });
   }
 
-  const paragraphs: string[] = [];
+  const blocks: [string, string[]][] = [];
   if (titleParts.length && notes.length) {
-    const first = Number(notes[0][0]);
-    paragraphs.push((first - 0.1).toFixed(1), titleParts.join(' ').replace(/\s+\(/g, ' ('));
+    blocks.push([(Number(notes[0][0] || notes[1]?.[0]) - 0.1).toFixed(1), [titleParts.join(' ')]]);
   }
-  let expected = notes.length ? Number(notes[0][0]) : 0;
+  let expected = 0;
   for (const [label, parts] of notes) {
-    if (Number(label) !== expected) warnings.push(`Para. ${expected} was expected but ${label} came next.`);
-    expected = Number(label) + 1;
-    paragraphs.push(label, ...parts);
+    if (!label) {
+      warnings.push(`A heading after the last paragraph was left out: "${parts[0]}".`);
+      continue;
+    }
+    if (!label.includes('.')) {
+      if (expected && Number(label) !== expected) warnings.push(`Para. ${expected} was expected but ${label} came next.`);
+      expected = Number(label) + 1;
+    }
+    blocks.push([label, parts]);
     if (parts.some((p) => p.includes(PICTURE_TEXT))) {
       warnings.push(`Para. ${label} has a picture in place of some text, shown as ${PICTURE_TEXT}.`);
     }
   }
 
-  // Footnote markers should run 1, 2, 3… through the text
-  const refs = paragraphs.flatMap((p) => [...p.matchAll(/\((\d+)\)/g)].map((m) => Number(m[1])));
+  // Footnote markers should run 1, 2, 3… through the text, each with its note if the PDF has them
+  const refs = blocks.flatMap(([, parts]) => parts.flatMap((p) => [...p.matchAll(REF)].map((m) => Number(m[1]))));
   refs.forEach((n, i) => {
     if (i > 0 && n !== refs[i - 1] + 1) warnings.push(`Footnote ${refs[i - 1]} is followed by ${n}.`);
+    if (footnotes.size && !footnotes.has(n)) warnings.push(`Footnote ${n} has no note text.`);
   });
+  for (const n of footnotes.keys()) {
+    if (!refs.includes(n)) warnings.push(`Note ${n} has no marker in the text and was left out.`);
+  }
+
+  const paragraphs: string[] = [];
+  for (const [label, parts] of blocks) {
+    const text = parts.map((p) => p.replace(REF, '($1)'));
+    const own = parts.flatMap((p) => [...p.matchAll(REF)].map((m) => Number(m[1])));
+    const notesHere = own.filter((n) => footnotes.has(n)).map((n) => `(${n}) ${footnotes.get(n)}`);
+    paragraphs.push(label, ...text, ...notesHere);
+  }
 
   return { paragraphs, warnings };
 }
