@@ -4,7 +4,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 
 /**
- * The signed-in database account, if any, and whether it may edit notes.
+ * The signed-in account, if any, and whether it may edit notes.
  * Being signed in isn't enough: the account must be listed in `curators`.
  */
 export function useCurator() {
@@ -34,6 +34,7 @@ export function useCurator() {
 
   return {
     session,
+    userId,
     email: session?.user.email,
     isCurator: !!userId && isCurator,
     /** Why the curator check failed, as opposed to the account simply not being a curator */
