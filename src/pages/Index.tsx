@@ -6,6 +6,7 @@ import { NoteForm, type NoteFormData } from '@/components/notes/NoteForm';
 import { NoteImport } from '@/components/notes/NoteImport';
 import { NoteCard } from '@/components/notes/NoteCard';
 import { SearchFilters } from '@/components/notes/SearchFilters';
+import { AskPanel } from '@/components/notes/AskPanel';
 import { TextPicker, type TextSelection } from '@/components/notes/TextPicker';
 import { ExportODTButton } from '@/components/notes/ExportODTButton';
 import { Button } from '@/components/ui/button';
@@ -181,6 +182,7 @@ const Index = () => {
             filters={filterLabels}
             onClearAll={() => setSearchParams({}, { replace: true })}
           />
+          {signedIn && <AskPanel notes={notes ?? []} />}
         </div>
 
         <div className="mt-6 space-y-6">
