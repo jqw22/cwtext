@@ -23,6 +23,14 @@ export interface ParsedDocument {
 const LABEL = /^\d+(?:\.\d+)?$/;
 const LABEL_WITH_TEXT = /^(\d+(?:\.\d+)?)\s+(\S[\s\S]*)$/;
 const FOOTNOTE = /^\(\d+\)\s/;
+/** A diary date used as a para. label, day-month-year: "121113" is 12 November 1913 */
+const DATE_LABEL = /^(0[1-9]|[12]\d|3[01])(0[1-9]|1[0-2])(\d\d)$/;
+
+/** Numeric order to 1dp: a date label is ordered by year, month and day, so entries sort by date */
+function labelOrder(label: string): string {
+  const date = label.match(DATE_LABEL);
+  return Number(date ? `${date[3]}${date[2]}${date[1]}` : label).toFixed(1);
+}
 
 /** How far ahead of the last para. number a number at the start of a paragraph may be and still count as a label */
 const MAX_INLINE_GAP = 10;
@@ -50,7 +58,7 @@ export function splitIntoNotes(paragraphs: string[]): ParsedDocument {
 
   const start = (label: string) => {
     finish();
-    current = { title: label, order: Number(label).toFixed(1), body: '', footnotes: [] };
+    current = { title: label, order: labelOrder(label), body: '', footnotes: [] };
   };
 
   for (const raw of paragraphs) {
@@ -75,7 +83,8 @@ export function splitIntoNotes(paragraphs: string[]): ParsedDocument {
 
     if (!current) {
       skipped.push(text);
-    } else if (FOOTNOTE.test(text)) {
+    } else if (FOOTNOTE.test(text) && bodyParts.length > 0) {
+      // The first paragraph is the note's text even when it starts with a footnote marker
       current.footnotes.push(text);
     } else {
       bodyParts.push(text);

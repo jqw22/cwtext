@@ -37,6 +37,26 @@ describe('splitIntoNotes', () => {
     expect(notes).toHaveLength(1);
     expect(notes[0].body).toBe('First part.\n\n1914 was the year…');
   });
+
+  it('takes diary dates as labels, in date order, and keeps a first paragraph that starts with a marker', () => {
+    const { notes } = splitIntoNotes([
+      '0.9',
+      'A huge task lay before me.',
+      '281113',
+      '(61) With inner resistance I approach this book.',
+      '(61) Sunday.',
+      '111213',
+      '(75) After a hard struggle…',
+    ]);
+
+    expect(notes.map((n) => [n.title, n.order])).toEqual([
+      ['0.9', '0.9'],
+      ['281113', '131128.0'],
+      ['111213', '131211.0'],
+    ]);
+    expect(notes[1].body).toBe('(61) With inner resistance I approach this book.');
+    expect(notes[1].footnotes).toEqual(['(61) Sunday.']);
+  });
 });
 
 describe('docxParagraphs', () => {
